@@ -17,39 +17,24 @@
  *                                                                            *
  ******************************************************************************/
 
-package io.nekohasekai.sagernet.fmt
+package io.nekohasekai.sagernet.plugin.hysteria2
 
-import io.nekohasekai.sagernet.database.ProxyEntity
+import android.net.Uri
+import android.os.ParcelFileDescriptor
+import io.nekohasekai.sagernet.plugin.NativePluginProvider
+import io.nekohasekai.sagernet.plugin.PathProvider
+import java.io.File
+import java.io.FileNotFoundException
 
-object TypeMap : HashMap<String, Int>() {
-    init {
-        this["socks"] = ProxyEntity.TYPE_SOCKS
-        this["http"] = ProxyEntity.TYPE_HTTP
-        this["ss"] = ProxyEntity.TYPE_SS
-        this["ssr"] = ProxyEntity.TYPE_SSR
-        this["vmess"] = ProxyEntity.TYPE_VMESS
-        this["vless"] = ProxyEntity.TYPE_VLESS
-        this["trojan"] = ProxyEntity.TYPE_TROJAN
-        this["trojan-go"] = ProxyEntity.TYPE_TROJAN_GO
-        this["naive"] = ProxyEntity.TYPE_NAIVE
-        this["pt"] = ProxyEntity.TYPE_PING_TUNNEL
-        this["rb"] = ProxyEntity.TYPE_RELAY_BATON
-        this["brook"] = ProxyEntity.TYPE_BROOK
-        this["config"] = ProxyEntity.TYPE_CONFIG
-        this["hysteria"] = ProxyEntity.TYPE_HYSTERIA
-        this["hysteria2"] = ProxyEntity.TYPE_HYSTERIA2
-        this["ssh"] = ProxyEntity.TYPE_SSH
-        this["wg"] = ProxyEntity.TYPE_WG
-        this["mieru"] = ProxyEntity.TYPE_MIERU
-        this["tuic"] = ProxyEntity.TYPE_TUIC
+class BinaryProvider : NativePluginProvider() {
+    override fun populateFiles(provider: PathProvider) {
+        provider.addPath("hysteria2-plugin", 0b111101101)
     }
 
-    val reversed = HashMap<Int, String>()
-
-    init {
-        TypeMap.forEach { (key, type) ->
-            reversed[type] = key
-        }
+    override fun getExecutable() = context!!.applicationInfo.nativeLibraryDir + "/libhysteria2.so"
+    override fun openFile(uri: Uri): ParcelFileDescriptor = when (uri.path) {
+        "/hysteria2-plugin" -> ParcelFileDescriptor.open(File(getExecutable()),
+            ParcelFileDescriptor.MODE_READ_ONLY)
+        else -> throw FileNotFoundException()
     }
-
 }
