@@ -28,41 +28,43 @@ import com.takisoft.preferencex.SimpleMenuPreference
 import io.nekohasekai.sagernet.Key
 import io.nekohasekai.sagernet.R
 import io.nekohasekai.sagernet.database.DataStore
-import io.nekohasekai.sagernet.fmt.tuic.TuicBean
+import io.nekohasekai.sagernet.fmt.tuic5.Tuic5Bean
 import io.nekohasekai.sagernet.ktx.applyDefaultValues
 
-class TuicSettingsActivity : ProfileSettingsActivity<TuicBean>() {
+class Tuic5SettingsActivity : ProfileSettingsActivity<Tuic5Bean>() {
 
-    override fun createEntity() = TuicBean().applyDefaultValues()
+    override fun createEntity() = Tuic5Bean().applyDefaultValues()
 
-    override fun TuicBean.init() {
+    override fun Tuic5Bean.init() {
         DataStore.profileName = name
         DataStore.serverAddress = serverAddress
         DataStore.serverPort = serverPort
-        DataStore.serverPassword = token
+        DataStore.serverUserId = uuid
+        DataStore.serverPassword = password
         DataStore.serverALPN = alpn
         DataStore.serverCertificates = caText
         DataStore.serverUDPRelayMode = udpRelayMode
-        DataStore.serverCongestionController = congestionController
+        DataStore.serverCongestionController = congestionControl
         DataStore.serverDisableSNI = disableSNI
         DataStore.serverSNI = sni
-        DataStore.serverReduceRTT = reduceRTT
+        DataStore.serverReduceRTT = zeroRTTHandshake
         DataStore.serverMTU = mtu
 
     }
 
-    override fun TuicBean.serialize() {
+    override fun Tuic5Bean.serialize() {
         name = DataStore.profileName
         serverAddress = DataStore.serverAddress
         serverPort = DataStore.serverPort
-        token = DataStore.serverPassword
+        uuid = DataStore.serverUserId
+        password = DataStore.serverPassword
         alpn = DataStore.serverALPN
         caText = DataStore.serverCertificates
         udpRelayMode = DataStore.serverUDPRelayMode
-        congestionController = DataStore.serverCongestionController
+        congestionControl = DataStore.serverCongestionController
         disableSNI = DataStore.serverDisableSNI
         sni = DataStore.serverSNI
-        reduceRTT = DataStore.serverReduceRTT
+        zeroRTTHandshake = DataStore.serverReduceRTT
         mtu = DataStore.serverMTU
     }
 
@@ -70,7 +72,7 @@ class TuicSettingsActivity : ProfileSettingsActivity<TuicBean>() {
         savedInstanceState: Bundle?,
         rootKey: String?,
     ) {
-        addPreferencesFromResource(R.xml.tuic_preferences)
+        addPreferencesFromResource(R.xml.tuic5_preferences)
 
         val disableSNI = findPreference<SwitchPreference>(Key.SERVER_DISABLE_SNI)!!
         val sni = findPreference<EditTextPreference>(Key.SERVER_SNI)!!
