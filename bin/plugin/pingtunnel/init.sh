@@ -2,7 +2,6 @@
 
 source "bin/init/env.sh"
 
-export GO111MODULE=off
 export CGO_ENABLED=1
 
 CURR="plugin/pingtunnel"
