@@ -30,25 +30,17 @@ import io.nekohasekai.sagernet.database.ProxyGroup
 import io.nekohasekai.sagernet.database.SagerDatabase
 import io.nekohasekai.sagernet.database.SubscriptionBean
 import io.nekohasekai.sagernet.fmt.AbstractBean
-import io.nekohasekai.sagernet.fmt.shadowsocks.parseShadowsocksConfig
-import io.nekohasekai.sagernet.fmt.wireguard.parseWireGuardConfig
 import io.nekohasekai.sagernet.ktx.*
 import libexclavecore.Libexclavecore
 import org.yaml.snakeyaml.DumperOptions
 import org.yaml.snakeyaml.LoaderOptions
 import org.yaml.snakeyaml.Yaml
-import org.yaml.snakeyaml.constructor.Constructor
-import org.yaml.snakeyaml.nodes.MappingNode
-import org.yaml.snakeyaml.nodes.Node
-import org.yaml.snakeyaml.nodes.ScalarNode
-import org.yaml.snakeyaml.nodes.SequenceNode
 import org.yaml.snakeyaml.nodes.Tag
 import org.yaml.snakeyaml.representer.Representer
 import org.yaml.snakeyaml.resolver.Resolver
 import java.util.regex.Pattern
 
-@Suppress("EXPERIMENTAL_API_USAGE")
-object RawUpdater : GroupUpdater() {
+object AgeUpdater : GroupUpdater() {
 
     override suspend fun doUpdate(
         proxyGroup: ProxyGroup,
@@ -60,12 +52,9 @@ object RawUpdater : GroupUpdater() {
         val link = subscription.link
         var proxies: List<AbstractBean>
         if (link.startsWith("content://", ignoreCase = true)) {
-            val contentText = app.contentResolver.openInputStream(link.toUri())
-                ?.bufferedReader()
-                ?.readText()
-
-            proxies = contentText?.let { parseRaw(contentText) }
-                ?: error(app.getString(R.string.no_proxies_found_in_subscription))
+            val content = app.contentResolver.openInputStream(link.toUri())?.readBytes()
+            val data = Libexclavecore.ageArmerDecrypt(content, subscription.agePrivateKey)
+            proxies = data?.let { parseRaw(String(data)) } ?: error(app.getString(R.string.no_proxies_found_in_subscription))
         } else {
             val response = Libexclavecore.newHttpClient().apply {
                 if (SagerNet.started && DataStore.startedProfile > 0) {
@@ -87,15 +76,15 @@ object RawUpdater : GroupUpdater() {
                 }
             }.execute()
 
-            proxies = parseRaw(response.contentString)
-                ?: error(app.getString(R.string.no_proxies_found))
+            val data = Libexclavecore.ageArmerDecrypt(response.content, subscription.agePrivateKey)
+            proxies = data?.let { parseRaw(String(data)) } ?: error(app.getString(R.string.no_proxies_found))
 
             val subscriptionUserinfo = response.getHeader("Subscription-Userinfo")
             if (subscriptionUserinfo.isNotEmpty()) {
                 fun get(regex: String): String? {
-                    return regex.toRegex().findAll(subscriptionUserinfo).mapNotNull {
+                    return regex.toRegex().findAll(subscriptionUserinfo).firstNotNullOfOrNull {
                         if (it.groupValues.size > 1) it.groupValues[1] else null
-                    }.firstOrNull()
+                    }
                 }
                 var used = 0L
                 try {
@@ -267,11 +256,6 @@ object RawUpdater : GroupUpdater() {
             }
         } catch (_: Exception) {}
         try {
-            parseJSONConfig(text).takeIf { it.isNotEmpty() }?.let {
-                return it
-            }
-        } catch (_: Exception) {}
-        try {
             parseShareLinks(text.decodeBase64()).takeIf { it.isNotEmpty() }?.let {
                 return it
             }
@@ -281,117 +265,6 @@ object RawUpdater : GroupUpdater() {
                 return it
             }
         } catch (_: Exception) {}
-        try {
-            parseWireGuardConfig(text).takeIf { it.isNotEmpty() }?.let {
-                return it
-            }
-        } catch (_: Exception) {}
         return null
-    }
-
-    @Suppress("UNCHECKED_CAST")
-    private fun parseJSONConfig(text: String): List<AbstractBean> {
-        val jsonElement = parseJson(stripJson(text, stripTrailingCommas = true))
-        if (jsonElement.isJsonArray) {
-            // https://github.com/XTLS/Xray-core/discussions/3765 WTF
-            val beans = ArrayList<AbstractBean>()
-            jsonElement.asJsonArray.forEach {
-                if (!it.isJsonObject) {
-                    return listOf()
-                }
-                val prefix = it.asJsonObject.getString("remarks", ignoreCase = true)
-                val outbounds = it.asJsonObject.getArray("outbounds", ignoreCase = true)
-                outbounds?.forEach { outbound ->
-                    val parsed = parseV2RayOutbound(outbound)
-                    if (!prefix.isNullOrEmpty()) {
-                        parsed.forEach { bean ->
-                            bean.initializeDefaultValues()
-                            bean.name = "$prefix ${bean.displayName()}"
-                        }
-                    }
-                    beans.addAll(parsed)
-                }
-            }
-            return beans
-        }
-        if (!jsonElement.isJsonObject) {
-            return listOf()
-        }
-        val jsonObject = jsonElement.asJsonObject
-        val beans = ArrayList<AbstractBean>()
-        when {
-            jsonObject.contains("protocol", ignoreCase = true) -> {
-                // V2Ray JSONv4 outbound or V2Ray JSONv5 outbound
-                return parseV2Ray5Outbound(jsonObject).takeIf { it.isNotEmpty() }
-                    ?: parseV2RayOutbound(jsonObject)
-            }
-            jsonObject.contains("proxies", ignoreCase = true) -> {
-                // Clash YAML
-                return listOf()
-            }
-            jsonObject.getInt("version") != null && jsonObject.contains("servers") -> {
-                // SIP008
-                val element = parseJson(text)
-                if (!element.isJsonObject) {
-                    return listOf()
-                }
-                element.asJsonObject.getArray("servers")?.forEach { server ->
-                    parseShadowsocksConfig(server)?.let {
-                        beans.add(it)
-                    }
-                }
-                return beans
-            }
-            jsonObject.contains("type") -> {
-                // sing-box outbound/endpoint
-                return parseSingBoxEndpoint(jsonObject).takeIf { it.isNotEmpty() }
-                    ?: parseSingBoxOutbound(jsonObject)
-            }
-            else -> {
-                val outbounds = jsonObject.getArray("outbounds", ignoreCase = true)
-                val endpoints = jsonObject.getArray("endpoints", ignoreCase = true)
-                val isV2Ray = !outbounds.isNullOrEmpty() && outbounds[0].contains("protocol", ignoreCase = true)
-                if (isV2Ray) {
-                    // V2Ray JSONv4 or V2Ray JSONv5
-                    outbounds.forEach {
-                        beans.addAll(parseV2Ray5Outbound(it).takeIf { it.isNotEmpty() }
-                            ?: parseV2RayOutbound(it))
-                    }
-                    return beans
-                }
-                val isSingBox = !endpoints.isNullOrEmpty() || (!outbounds.isNullOrEmpty() && outbounds[0].contains("type"))
-                if (isSingBox) {
-                    // sing-box
-                    outbounds?.forEach {
-                        beans.addAll(parseSingBoxOutbound(it))
-                    }
-                    endpoints?.forEach {
-                        beans.addAll(parseSingBoxEndpoint(it))
-                    }
-                    return beans
-                }
-                return listOf()
-            }
-        }
-    }
-}
-
-class YAMLConstructor(
-    options: LoaderOptions,
-) : Constructor(options) {
-    override fun constructObject(node: Node): Any? {
-        when (node.tag) {
-            Tag.NULL, Tag.BOOL, Tag.INT, Tag.FLOAT, Tag.STR, Tag.SEQ, Tag.MAP, Tag.BINARY,
-            Tag.TIMESTAMP, Tag.SET, Tag.OMAP, Tag.PAIRS, Tag.YAML, Tag.MERGE -> {
-                return super.constructObject(node)
-            }
-        }
-        // ignore unknown tags
-        return when (node) {
-            is MappingNode -> constructMapping(node)
-            is SequenceNode -> constructSequence(node)
-            is ScalarNode -> constructScalar(node)
-            else -> null
-        }
     }
 }
