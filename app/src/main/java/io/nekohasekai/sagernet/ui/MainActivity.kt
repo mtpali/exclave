@@ -33,6 +33,7 @@ import android.provider.Settings
 import android.text.util.Linkify
 import android.view.KeyEvent
 import android.view.MenuItem
+import android.view.MotionEvent
 import android.view.View
 import android.widget.TextView
 import android.widget.Toast
@@ -45,6 +46,7 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.setPadding
 import androidx.core.view.updatePadding
+import androidx.lifecycle.lifecycleScope
 import androidx.preference.PreferenceDataStore
 import com.google.android.material.bottomappbar.BottomAppBar.FAB_ALIGNMENT_MODE_CENTER
 import com.google.android.material.bottomappbar.BottomAppBar.FAB_ALIGNMENT_MODE_END
@@ -58,6 +60,7 @@ import io.nekohasekai.sagernet.aidl.ISagerNetService
 import io.nekohasekai.sagernet.aidl.TrafficStats
 import io.nekohasekai.sagernet.bg.BaseService
 import io.nekohasekai.sagernet.bg.SagerConnection
+import io.nekohasekai.sagernet.bg.test.V2RayTestInstance
 import io.nekohasekai.sagernet.database.*
 import io.nekohasekai.sagernet.database.preference.OnPreferenceDataStoreChangeListener
 import io.nekohasekai.sagernet.databinding.LayoutMainBinding
@@ -69,6 +72,15 @@ import io.nekohasekai.sagernet.ktx.*
 import io.nekohasekai.sagernet.utils.PackageCache
 import io.noties.markwon.Markwon
 import libexclavecore.Libexclavecore
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
+import kotlinx.coroutines.withContext
 
 class MainActivity : ThemedActivity(),
     SagerConnection.Callback,
@@ -83,6 +95,9 @@ class MainActivity : ThemedActivity(),
     private enum class HomeMode { AUTO, MANUAL }
 
     private var homeMode = HomeMode.AUTO
+    private var smartConnectJob: Job? = null
+    private var smartConnectGeneration = 0L
+    private var swipeDownX = 0f
 
     override val onBackPressedCallback = object : OnBackPressedCallback(enabled = false) {
         override fun handleOnBackPressed() {
@@ -124,7 +139,10 @@ class MainActivity : ThemedActivity(),
         binding.mobiletinaMenu.setOnClickListener { binding.drawerLayout.open() }
         binding.btnModeAuto.setOnClickListener { setHomeMode(HomeMode.AUTO) }
         binding.btnModeManual.setOnClickListener { setHomeMode(HomeMode.MANUAL) }
-        binding.fabAuto.setOnClickListener { toggleService() }
+        binding.fabAuto.setOnClickListener { smartConnectOrStop() }
+        binding.fabManual.setOnClickListener { toggleService() }
+        binding.btnSmartConnect.setOnClickListener { smartConnectOrStop() }
+        binding.modeContainer.setOnTouchListener { _, event -> handleModeSwipe(event) }
         if (resources.configuration.layoutDirection == View.LAYOUT_DIRECTION_RTL) {
             ViewCompat.setOnApplyWindowInsetsListener(navigation) { v, insets ->
                 val bars = insets.getInsets(
@@ -210,11 +228,114 @@ class MainActivity : ThemedActivity(),
         if (state.canStop) SagerNet.stopService() else connect.launch(null)
     }
 
+    private fun smartConnectOrStop() {
+        if (state.canStop || smartConnectJob?.isActive == true) {
+            cancelSmartConnect()
+            if (state.canStop) SagerNet.stopService()
+            return
+        }
+        val generation = ++smartConnectGeneration
+        updateMobileTinaState(BaseService.State.Connecting)
+        binding.tvAutoServer.setText(R.string.mobiletina_testing)
+        smartConnectJob = lifecycleScope.launchWhenStarted {
+            val profiles = withContext(Dispatchers.IO) {
+                SagerDatabase.proxyDao.getByGroup(DataStore.currentGroupId())
+            }
+            if (generation != smartConnectGeneration) return@launchWhenStarted
+            if (profiles.isEmpty()) {
+                markSmartConnectFailed(getString(R.string.no_proxies_found))
+                return@launchWhenStarted
+            }
+            val best = if (profiles.size == 1) profiles.first()
+            else testAndSelectBest(profiles, generation)
+            if (generation != smartConnectGeneration) return@launchWhenStarted
+            if (best == null) {
+                markSmartConnectFailed(getString(R.string.mobiletina_no_working_server))
+                return@launchWhenStarted
+            }
+            DataStore.selectedProxy = best.id
+            binding.tvAutoServer.text = best.displayName()
+            binding.tvManualSelected.text = if (best.ping > 0) {
+                "${best.displayName()}  •  ${best.ping} ms"
+            } else best.displayName()
+            binding.tvAutoPing.apply {
+                visibility = if (best.ping > 0) View.VISIBLE else View.GONE
+                text = if (best.ping > 0) "${best.ping} ms" else ""
+            }
+            smartConnectJob = null
+            connect.launch(null)
+        }
+    }
+
+    private suspend fun testAndSelectBest(
+        profiles: List<ProxyEntity>, generation: Long,
+    ): ProxyEntity? = coroutineScope {
+        val semaphore = Semaphore(4)
+        suspend fun test(profile: ProxyEntity): ProxyEntity? = semaphore.withPermit {
+            if (generation != smartConnectGeneration) return@withPermit null
+            runCatching {
+                val result = V2RayTestInstance(
+                    profile, DataStore.connectionTestURL, 5_000
+                ).use { it.doTest() }
+                profile.status = 1
+                profile.ping = result
+                profile.error = null
+                ProfileManager.updateProfile(profile)
+                profile.takeIf { result > 0 }
+            }.getOrElse {
+                profile.status = 3
+                profile.ping = 0
+                profile.error = it.readableMessage
+                ProfileManager.updateProfile(profile)
+                null
+            }
+        }
+        var working = profiles.map { async(Dispatchers.IO) { test(it) } }.awaitAll().filterNotNull()
+        if (working.isEmpty() && generation == smartConnectGeneration) {
+            delay(1_000L)
+            working = profiles.map { async(Dispatchers.IO) { test(it) } }.awaitAll().filterNotNull()
+        }
+        working.minByOrNull { it.ping }
+    }
+
+    private fun cancelSmartConnect() {
+        smartConnectGeneration++
+        smartConnectJob?.cancel()
+        smartConnectJob = null
+    }
+
+    private fun markSmartConnectFailed(message: String) {
+        smartConnectJob = null
+        updateMobileTinaState(BaseService.State.Stopped, failed = true)
+        binding.tvAutoServer.text = message
+        snackbar(message).show()
+    }
+
+    private fun handleModeSwipe(event: MotionEvent): Boolean {
+        when (event.actionMasked) {
+            MotionEvent.ACTION_DOWN -> swipeDownX = event.x
+            MotionEvent.ACTION_UP -> {
+                val delta = event.x - swipeDownX
+                if (kotlin.math.abs(delta) >= dp2px(72)) {
+                    setHomeMode(if (delta < 0) HomeMode.AUTO else HomeMode.MANUAL)
+                    return true
+                }
+            }
+        }
+        return false
+    }
+
     private fun setHomeMode(mode: HomeMode) {
         homeMode = mode
         val auto = mode == HomeMode.AUTO
         binding.autoPanel.visibility = if (auto) View.VISIBLE else View.GONE
         binding.coordinator.visibility = if (auto) View.GONE else View.VISIBLE
+        binding.manualDock.visibility = if (auto) View.GONE else View.VISIBLE
+        binding.fab.visibility = View.GONE
+        binding.fabProgress.visibility = View.GONE
+        binding.stats.visibility = View.GONE
+        (supportFragmentManager.findFragmentById(R.id.fragment_holder) as? ConfigurationFragment)
+            ?.setMobileTinaPresentation(!auto)
         styleModeButton(binding.btnModeAuto, auto)
         styleModeButton(binding.btnModeManual, !auto)
     }
@@ -377,12 +498,11 @@ class MainActivity : ThemedActivity(),
 
     fun displayFragment(fragment: ToolbarFragment) {
         if (::binding.isInitialized) setHomeMode(HomeMode.MANUAL)
-        if (fragment !is LogcatFragment) {
-            binding.fab.show()
-        }
         supportFragmentManager.beginTransaction()
             .replace(R.id.fragment_holder, fragment)
             .commitAllowingStateLoss()
+        supportFragmentManager.executePendingTransactions()
+        (fragment as? ConfigurationFragment)?.setMobileTinaPresentation(homeMode == HomeMode.MANUAL)
         binding.drawerLayout.closeDrawers()
     }
 
@@ -468,6 +588,11 @@ class MainActivity : ThemedActivity(),
         binding.fabAuto.setImageResource(image)
         binding.tvAutoStatus.setText(status)
         if (!profileName.isNullOrBlank()) binding.tvAutoServer.text = profileName
+        binding.fabManual.setImageResource(
+            if (state == BaseService.State.Connected) R.drawable.mt_manual_fab
+            else R.drawable.mt_manual_stop
+        )
+        if (!profileName.isNullOrBlank()) binding.tvManualSelected.text = profileName
     }
 
     override fun snackbarInternal(text: CharSequence): Snackbar {
@@ -641,6 +766,7 @@ class MainActivity : ThemedActivity(),
     }
 
     override fun onDestroy() {
+        cancelSmartConnect()
         super.onDestroy()
         DataStore.configurationStore.unregisterChangeListener(this)
         connection.disconnect(this)
