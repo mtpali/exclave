@@ -116,6 +116,7 @@ fun Project.setupAppCommon(projectName: String = "") {
         }
 
         defaultConfig.targetSdk = 37
+        defaultConfig.ndk.abiFilters.addAll(listOf("armeabi-v7a", "arm64-v8a"))
         buildTypes.getByName("release") {
             @Suppress("UnstableApiUsage")
             vcsInfo.include = false
