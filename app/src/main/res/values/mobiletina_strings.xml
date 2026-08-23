@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="mobiletina_mode_auto" translatable="false">حالت خودکار</string>
+    <string name="mobiletina_mode_manual" translatable="false">حالت دستی</string>
+    <string name="mobiletina_status_connected" translatable="false">متصل شد</string>
+    <string name="mobiletina_status_disconnected" translatable="false">فیلترشکن خاموش است</string>
+    <string name="mobiletina_status_connecting" translatable="false">در حال اتصال…</string>
+    <string name="mobiletina_status_failed" translatable="false">اتصال ناموفق بود</string>
+    <string name="mobiletina_connect_action" translatable="false">اتصال</string>
+    <string name="mobiletina_open_menu" translatable="false">باز کردن منو</string>
+</resources>

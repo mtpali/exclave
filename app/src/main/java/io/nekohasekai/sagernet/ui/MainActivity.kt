@@ -23,6 +23,7 @@ package io.nekohasekai.sagernet.ui
 
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.content.res.ColorStateList
 import android.Manifest
 import android.net.Uri
 import android.os.Build
@@ -39,6 +40,7 @@ import androidx.activity.OnBackPressedCallback
 import androidx.annotation.IdRes
 import androidx.appcompat.app.AlertDialog
 import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.setPadding
@@ -46,6 +48,7 @@ import androidx.core.view.updatePadding
 import androidx.preference.PreferenceDataStore
 import com.google.android.material.bottomappbar.BottomAppBar.FAB_ALIGNMENT_MODE_CENTER
 import com.google.android.material.bottomappbar.BottomAppBar.FAB_ALIGNMENT_MODE_END
+import com.google.android.material.button.MaterialButton
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.navigation.NavigationView
 import com.google.android.material.snackbar.Snackbar
@@ -76,6 +79,10 @@ class MainActivity : ThemedActivity(),
     lateinit var navigation: NavigationView
 
     val userInterface by lazy { GroupInterfaceAdapter(this) }
+
+    private enum class HomeMode { AUTO, MANUAL }
+
+    private var homeMode = HomeMode.AUTO
 
     override val onBackPressedCallback = object : OnBackPressedCallback(enabled = false) {
         override fun handleOnBackPressed() {
@@ -114,6 +121,10 @@ class MainActivity : ThemedActivity(),
             binding.drawerLayout.removeView(binding.navView)
         }
         navigation.setNavigationItemSelectedListener(this)
+        binding.mobiletinaMenu.setOnClickListener { binding.drawerLayout.open() }
+        binding.btnModeAuto.setOnClickListener { setHomeMode(HomeMode.AUTO) }
+        binding.btnModeManual.setOnClickListener { setHomeMode(HomeMode.MANUAL) }
+        binding.fabAuto.setOnClickListener { toggleService() }
         if (resources.configuration.layoutDirection == View.LAYOUT_DIRECTION_RTL) {
             ViewCompat.setOnApplyWindowInsetsListener(navigation) { v, insets ->
                 val bars = insets.getInsets(
@@ -146,16 +157,13 @@ class MainActivity : ThemedActivity(),
             displayFragmentWithId(R.id.nav_configuration)
         }
 
-        binding.fab.setOnClickListener {
-            if (state.canStop) SagerNet.stopService() else connect.launch(
-                null
-            )
-        }
+        binding.fab.setOnClickListener { toggleService() }
         binding.stats.setOnClickListener { if (state == BaseService.State.Connected) binding.stats.testConnection() }
 
         setContentView(binding.root)
 
         changeState(BaseService.State.Idle)
+        setHomeMode(HomeMode.AUTO)
         connection.connect(this, this)
         DataStore.configurationStore.registerChangeListener(this)
 
@@ -196,6 +204,32 @@ class MainActivity : ThemedActivity(),
                 requestPermissions()
             }
         }
+    }
+
+    private fun toggleService() {
+        if (state.canStop) SagerNet.stopService() else connect.launch(null)
+    }
+
+    private fun setHomeMode(mode: HomeMode) {
+        homeMode = mode
+        val auto = mode == HomeMode.AUTO
+        binding.autoPanel.visibility = if (auto) View.VISIBLE else View.GONE
+        binding.coordinator.visibility = if (auto) View.GONE else View.VISIBLE
+        styleModeButton(binding.btnModeAuto, auto)
+        styleModeButton(binding.btnModeManual, !auto)
+    }
+
+    private fun styleModeButton(materialButton: MaterialButton, selected: Boolean) {
+        val background = ContextCompat.getColor(
+            this,
+            if (selected) R.color.mobiletina_mode_selected else R.color.mobiletina_mode_unselected,
+        )
+        val foreground = ContextCompat.getColor(
+            this,
+            if (selected) R.color.mobiletina_mode_text_selected else R.color.mobiletina_mode_text_unselected,
+        )
+        materialButton.backgroundTintList = ColorStateList.valueOf(background)
+        materialButton.setTextColor(foreground)
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -342,6 +376,7 @@ class MainActivity : ThemedActivity(),
 
 
     fun displayFragment(fragment: ToolbarFragment) {
+        if (::binding.isInitialized) setHomeMode(HomeMode.MANUAL)
         if (fragment !is LogcatFragment) {
             binding.fab.show()
         }
@@ -400,6 +435,7 @@ class MainActivity : ThemedActivity(),
 
         binding.fab.changeState(state, this.state, animate)
         binding.stats.changeState(state)
+        updateMobileTinaState(state, failed = msg != null && state == BaseService.State.Stopped)
         if (msg != null) snackbar(msg).show()
         this.state = state
 
@@ -415,14 +451,34 @@ class MainActivity : ThemedActivity(),
         }
     }
 
+    private fun updateMobileTinaState(
+        state: BaseService.State,
+        profileName: String? = null,
+        failed: Boolean = false,
+    ) {
+        val (image, status) = if (failed) {
+            R.drawable.mt_auto_red to R.string.mobiletina_status_failed
+        } else when (state) {
+            BaseService.State.Connected -> R.drawable.mt_auto_blue to R.string.mobiletina_status_connected
+            BaseService.State.Connecting, BaseService.State.Stopping ->
+                R.drawable.mt_auto_yellow to R.string.mobiletina_status_connecting
+            BaseService.State.Idle, BaseService.State.Stopped ->
+                R.drawable.mt_auto_white to R.string.mobiletina_status_disconnected
+        }
+        binding.fabAuto.setImageResource(image)
+        binding.tvAutoStatus.setText(status)
+        if (!profileName.isNullOrBlank()) binding.tvAutoServer.text = profileName
+    }
+
     override fun snackbarInternal(text: CharSequence): Snackbar {
-        return Snackbar.make(binding.coordinator, text, Snackbar.LENGTH_LONG).apply {
-            anchorView = binding.fab
+        return Snackbar.make(binding.drawerLayout, text, Snackbar.LENGTH_LONG).apply {
+            if (homeMode == HomeMode.MANUAL) anchorView = binding.fab
         }
     }
 
     override fun stateChanged(state: BaseService.State, profileName: String?, msg: String?) {
         changeState(state, msg, true)
+        updateMobileTinaState(state, profileName)
     }
 
     override fun statsUpdated(stats: List<AppStats>) {

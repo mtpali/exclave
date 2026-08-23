@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="mobiletina_mode_surface">#17181C</color>
+    <color name="mobiletina_mode_selected">#F4F5F7</color>
+    <color name="mobiletina_mode_unselected">#17181C</color>
+    <color name="mobiletina_mode_text_selected">#17181C</color>
+    <color name="mobiletina_mode_text_unselected">#A9ADB7</color>
+    <color name="mobiletina_mode_stroke">#303238</color>
+    <color name="mobiletina_status_secondary">#A9ADB7</color>
+</resources>
