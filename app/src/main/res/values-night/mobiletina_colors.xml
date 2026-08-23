@@ -7,4 +7,6 @@
     <color name="mobiletina_mode_text_unselected">#A9ADB7</color>
     <color name="mobiletina_mode_stroke">#303238</color>
     <color name="mobiletina_status_secondary">#A9ADB7</color>
+    <color name="mobiletina_manual_dock_bg">#111214</color>
+    <color name="mobiletina_manual_dock_text">#D7D9DE</color>
 </resources>
