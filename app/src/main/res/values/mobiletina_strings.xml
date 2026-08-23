@@ -10,4 +10,5 @@
     <string name="mobiletina_status_failed" translatable="false">اتصال ناموفق بود</string>
     <string name="mobiletina_connect_action" translatable="false">اتصال</string>
     <string name="mobiletina_open_menu" translatable="false">باز کردن منو</string>
+    <!-- CI marker for the MobileTina UI/Smart Connect test build. -->
 </resources>
