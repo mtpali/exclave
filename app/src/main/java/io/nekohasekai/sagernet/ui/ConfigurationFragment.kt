@@ -98,6 +98,15 @@ class ConfigurationFragment @JvmOverloads constructor(
     PopupMenu.OnMenuItemClickListener,
     Toolbar.OnMenuItemClickListener {
 
+    fun setMobileTinaPresentation(enabled: Boolean) {
+        if (!isAdded || view == null) return
+        view?.findViewById<View>(R.id.appbar)?.isGone = enabled
+        if (::groupPager.isInitialized) {
+            groupPager.clipToPadding = false
+            groupPager.setPadding(0, 0, 0, if (enabled) dp2px(126) else 0)
+        }
+    }
+
     val onBackPressedCallback = object : OnBackPressedCallback(enabled = false) {
         override fun handleOnBackPressed() {
             searchView?.onActionViewCollapsed()
