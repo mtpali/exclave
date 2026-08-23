@@ -246,3 +246,5 @@ fun Project.setupApp() {
         }
     }
 }
+
+// MobileTina test builds package ARMv7 and ARMv8 in one APK.
