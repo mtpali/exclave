@@ -116,6 +116,7 @@ fun Project.setupAppCommon(projectName: String = "") {
         }
 
         defaultConfig.targetSdk = 37
+        defaultConfig.ndk.abiFilters.addAll(listOf("armeabi-v7a", "arm64-v8a"))
         buildTypes.getByName("release") {
             @Suppress("UnstableApiUsage")
             vcsInfo.include = false
@@ -138,9 +139,9 @@ fun Project.setupAppCommon(projectName: String = "") {
         if (gradle.startParameter.taskNames.isNotEmpty() && gradle.startParameter.taskNames.any { it.lowercase().contains("assemble") }) {
             splits.abi.apply {
                 isEnable = true
-                isUniversalApk = false
+                isUniversalApk = true
                 reset()
-                include("x86", "x86_64", "armeabi-v7a", "arm64-v8a")
+                include("armeabi-v7a", "arm64-v8a")
             }
         }
     }
