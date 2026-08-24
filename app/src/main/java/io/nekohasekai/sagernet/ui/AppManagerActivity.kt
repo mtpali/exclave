@@ -130,7 +130,7 @@ class AppManagerActivity : ThemedActivity() {
             apps = cachedApps.map { (packageName, packageInfo) ->
                 coroutineContext[Job]!!.ensureActive()
                 ProxiedApp(packageManager, packageInfo.applicationInfo!!, packageName)
-            }.sortedWith(compareBy({ !isProxiedApp(it) }, { it.name.toString() }))
+            }.let(::sortApps)
         }
 
         override fun onBindViewHolder(holder: AppViewHolder, position: Int) =
@@ -194,6 +194,23 @@ class AppManagerActivity : ThemedActivity() {
     }
 
     private fun isProxiedApp(app: ProxiedApp) = proxiedUids[app.uid]
+
+    private fun preferredAppRank(packageName: String): Int = when (packageName) {
+        "com.instagram.android" -> 0
+        "org.telegram.messenger", "org.telegram.messenger.web", "org.thunderdog.challegram" -> 1
+        "com.whatsapp", "com.whatsapp.w4b" -> 2
+        "com.android.chrome" -> 3
+        "com.google.android.googlequicksearchbox" -> 4
+        else -> Int.MAX_VALUE
+    }
+
+    private fun sortApps(source: List<ProxiedApp>): List<ProxiedApp> = source.sortedWith(
+        compareBy<ProxiedApp>(
+            { preferredAppRank(it.packageName) },
+            { !isProxiedApp(it) },
+            { it.name.toString().lowercase() },
+        )
+    )
 
     @UiThread
     private fun loadApps() {
@@ -294,7 +311,7 @@ class AppManagerActivity : ThemedActivity() {
                     }
                     DataStore.individual = apps.filter { isProxiedApp(it) }
                         .joinToString("\n") { it.packageName }
-                    apps = apps.sortedWith(compareBy({ !isProxiedApp(it) }, { it.name.toString() }))
+                    apps = sortApps(apps)
                     onMainDispatcher {
                         appsAdapter.filter.filter("")
                     }
@@ -306,7 +323,7 @@ class AppManagerActivity : ThemedActivity() {
                 runOnDefaultDispatcher {
                     proxiedUids.clear()
                     DataStore.individual = ""
-                    apps = apps.sortedWith(compareBy({ !isProxiedApp(it) }, { it.name.toString() }))
+                    apps = sortApps(apps)
                     onMainDispatcher {
                         appsAdapter.filter.filter("")
                     }

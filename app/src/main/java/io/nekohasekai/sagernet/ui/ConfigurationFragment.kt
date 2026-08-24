@@ -1566,7 +1566,8 @@ class ConfigurationFragment @JvmOverloads constructor(
                 }
 
                 if (proxyEntity.status == 3) {
-                    profileStatus.text = "—"
+                    profileStatus.setText(R.string.mobiletina_inactive)
+                    profileStatus.setTextColor(Color.RED)
                     profileStatus.setOnClickListener {
                         alert(proxyEntity.error ?: "<?>").show()
                     }

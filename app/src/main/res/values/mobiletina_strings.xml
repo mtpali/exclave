@@ -12,7 +12,7 @@
     <string name="mobiletina_open_menu" translatable="false">باز کردن منو</string>
     <string name="mobiletina_menu_home" translatable="false">‎صفحه اصلی</string>
     <string name="mobiletina_menu_subscriptions" translatable="false">‎اشتراک‌ها</string>
-    <string name="mobiletina_menu_per_app" translatable="false">‎فیلتر برنامه‌ها</string>
+    <string name="mobiletina_menu_per_app" translatable="false">‎تفکیک برنامه‌ها</string>
     <string name="mobiletina_menu_about" translatable="false">‎درباره موبایل تینا</string>
     <string name="mobiletina_app_title" translatable="false">فیلترشکن</string>
     <string name="mobiletina_scan" translatable="false">اسکن کد</string>
@@ -34,4 +34,15 @@
     <string name="mobiletina_ping_testing" translatable="false">در حال بررسی پینگ…</string>
     <string name="mobiletina_ping_tap" translatable="false">بررسی پینگ</string>
     <string name="mobiletina_refreshing_subscription" translatable="false">در حال بروزرسانی اشتراک…</string>
+    <string name="mobiletina_inactive" translatable="false">غیرفعال</string>
+    <string name="mobiletina_ping_value" translatable="false">پینگ : %1$d</string>
+    <string name="mobiletina_more_update" translatable="false">بروزرسانی اشتراک</string>
+    <string name="mobiletina_more_speed_test" translatable="false">تست سرعت</string>
+    <string name="mobiletina_more_sort" translatable="false">مرتب سازی</string>
+    <string name="mobiletina_sort_latency" translatable="false">بر اساس پینگ</string>
+    <string name="mobiletina_sort_name" translatable="false">بر اساس نام</string>
+    <string name="mobiletina_sort_original" translatable="false">ترتیب اصلی</string>
+    <string name="mobiletina_subscriptions_unlocked" translatable="false">بخش اشتراک‌ها تا زمان بستن برنامه فعال شد</string>
+    <string name="mobiletina_copy_subscription_link" translatable="false">کپی لینک اشتراک</string>
+    <string name="mobiletina_all_configs_copied" translatable="false">تمام کانفیگ‌ها کپی شدند</string>
 </resources>

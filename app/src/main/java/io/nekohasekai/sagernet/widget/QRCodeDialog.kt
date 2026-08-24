@@ -58,6 +58,21 @@ class QRCodeDialog() : DialogFragment() {
                 app.resources.getDimensionPixelSize(R.dimen.qrcode_size)
             }
         }
+
+        fun createBitmap(content: String, targetSize: Int = size): Bitmap {
+            val hints = mutableMapOf<EncodeHintType, Any>()
+            if (!iso88591.canEncode(content)) {
+                hints[EncodeHintType.CHARACTER_SET] = StandardCharsets.UTF_8.name()
+            }
+            val qrBits = QRCodeWriter().encode(
+                content, BarcodeFormat.QR_CODE, targetSize, targetSize, hints
+            )
+            return Bitmap.createBitmap(targetSize, targetSize, Bitmap.Config.RGB_565).apply {
+                for (x in 0 until targetSize) for (y in 0 until targetSize) {
+                    setPixel(x, y, if (qrBits.get(x, y)) Color.BLACK else Color.WHITE)
+                }
+            }
+        }
     }
 
     constructor(url: String) : this() {
@@ -73,16 +88,9 @@ packages/apps/Settings/+/8a9ccfd/src/com/android/settings/wifi/dpp/WifiDppQrCode
      */
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?) = try {
         val url = arguments?.getString(KEY_URL)!!
-        val hints = mutableMapOf<EncodeHintType, Any>()
-        if (!iso88591.canEncode(url)) hints[EncodeHintType.CHARACTER_SET] = StandardCharsets.UTF_8.name()
-        val qrBits = QRCodeWriter().encode(url, BarcodeFormat.QR_CODE, size, size, hints)
         ImageView(context).apply {
             layoutParams = ViewGroup.LayoutParams(size, size)
-            setImageBitmap(Bitmap.createBitmap(size, size, Bitmap.Config.RGB_565).apply {
-                for (x in 0 until size) for (y in 0 until size) {
-                    setPixel(x, y, if (qrBits.get(x, y)) Color.BLACK else Color.WHITE)
-                }
-            })
+            setImageBitmap(createBitmap(url))
         }
     } catch (e: WriterException) {
         Logs.w(e)

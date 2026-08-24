@@ -29,6 +29,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.RemoteException
+import android.os.SystemClock
 import android.provider.Settings
 import android.view.KeyEvent
 import android.view.Gravity
@@ -36,12 +37,14 @@ import android.view.MenuItem
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
+import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.annotation.IdRes
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.core.content.res.ResourcesCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.updatePadding
@@ -99,6 +102,9 @@ class MainActivity : ThemedActivity(),
     private var smartConnectJob: Job? = null
     private var pingRefreshJob: Job? = null
     private var clearAllJob: Job? = null
+    private var subscriptionAutoRefreshJob: Job? = null
+    private var subscriptionNavRevealRunnable: Runnable? = null
+    private var lastSubscriptionAutoRefreshAt = 0L
     private var smartConnectGeneration = 0L
     private var swipeDownX = 0f
     private var swipeDownY = 0f
@@ -141,10 +147,12 @@ class MainActivity : ThemedActivity(),
             binding.drawerLayout.removeView(binding.navView)
         }
         navigation.setNavigationItemSelectedListener(this)
+        navigation.menu.findItem(R.id.nav_group)?.isVisible = false
         navigation.layoutDirection = View.LAYOUT_DIRECTION_LTR
         navigation.textDirection = View.TEXT_DIRECTION_LTR
         navigation.textAlignment = View.TEXT_ALIGNMENT_VIEW_START
         navigation.post { forceLtrTree(navigation) }
+        installHiddenSubscriptionsEntry()
         binding.mobiletinaMenu.setOnClickListener { binding.drawerLayout.open() }
         binding.mobiletinaScan.setOnClickListener {
             startActivity(Intent(this, ScannerActivity::class.java))
@@ -227,6 +235,37 @@ class MainActivity : ThemedActivity(),
         }
     }
 
+    private fun installHiddenSubscriptionsEntry() {
+        val logo = navigation.getHeaderView(0).findViewById<ImageView>(R.id.mobiletina_nav_logo)
+        logo.setOnTouchListener { view, event ->
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    cancelSubscriptionNavReveal(view)
+                    val reveal = Runnable {
+                        subscriptionNavRevealRunnable = null
+                        if (!isFinishing && !isDestroyed && view.isAttachedToWindow) {
+                            navigation.menu.findItem(R.id.nav_group)?.isVisible = true
+                            navigation.post { forceLtrTree(navigation) }
+                            snackbar(R.string.mobiletina_subscriptions_unlocked).show()
+                        }
+                    }
+                    subscriptionNavRevealRunnable = reveal
+                    view.postDelayed(reveal, SUBSCRIPTION_ENTRY_HOLD_MS)
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> cancelSubscriptionNavReveal(view)
+            }
+            true
+        }
+    }
+
+    private fun cancelSubscriptionNavReveal(view: View? = null) {
+        subscriptionNavRevealRunnable?.let { runnable ->
+            (view ?: navigation.getHeaderView(0)
+                .findViewById<ImageView>(R.id.mobiletina_nav_logo)).removeCallbacks(runnable)
+        }
+        subscriptionNavRevealRunnable = null
+    }
+
     private fun toggleService() {
         if (state.canStop) SagerNet.stopService() else connect.launch(null)
     }
@@ -263,7 +302,7 @@ class MainActivity : ThemedActivity(),
             } else best.displayName()
             binding.tvAutoPing.apply {
                 visibility = if (best.ping > 0) View.VISIBLE else View.GONE
-                text = if (best.ping > 0) "${best.ping} ms" else ""
+                text = if (best.ping > 0) getString(R.string.mobiletina_ping_value, best.ping) else ""
             }
             smartConnectJob = null
             connect.launch(null)
@@ -507,6 +546,7 @@ class MainActivity : ThemedActivity(),
         view.textAlignment = View.TEXT_ALIGNMENT_VIEW_START
         if (view is TextView) {
             view.gravity = Gravity.START or Gravity.CENTER_VERTICAL
+            ResourcesCompat.getFont(this, R.font.text)?.let { view.typeface = it }
         }
         if (view is ViewGroup) {
             for (index in 0 until view.childCount) forceLtrTree(view.getChildAt(index))
@@ -766,7 +806,7 @@ class MainActivity : ThemedActivity(),
             binding.tvAutoPing.apply {
                 visibility = View.VISIBLE
                 text = if (ping > 0) {
-                    "$ping ms"
+                    getString(R.string.mobiletina_ping_value, ping)
                 } else getString(R.string.mobiletina_ping_tap)
             }
         }
@@ -786,7 +826,7 @@ class MainActivity : ThemedActivity(),
             val result = withContext(Dispatchers.IO) { runCatching { urlTest() } }
             if (state == BaseService.State.Connected) {
                 binding.tvAutoPing.text = result.fold(
-                    onSuccess = { "$it ms" },
+                    onSuccess = { getString(R.string.mobiletina_ping_value, it) },
                     onFailure = { previousText.takeIf { it.isNotBlank() }
                         ?: getString(R.string.mobiletina_ping_tap) },
                 )
@@ -948,6 +988,45 @@ class MainActivity : ThemedActivity(),
         GroupManager.userInterface = userInterface
     }
 
+    override fun onResume() {
+        super.onResume()
+        refreshSubscriptionsOnResume()
+    }
+
+    private fun refreshSubscriptionsOnResume() {
+        val now = SystemClock.elapsedRealtime()
+        if (subscriptionAutoRefreshJob?.isActive == true ||
+            lastSubscriptionAutoRefreshAt != 0L &&
+            now - lastSubscriptionAutoRefreshAt < SUBSCRIPTION_REFRESH_GUARD_MS) return
+
+        subscriptionAutoRefreshJob = lifecycleScope.launchWhenStarted {
+            val subscriptions = withContext(Dispatchers.IO) {
+                SagerDatabase.groupDao.allGroups().filter { group ->
+                    group.type == GroupType.SUBSCRIPTION &&
+                            !group.subscription?.link.isNullOrBlank()
+                }
+            }
+            if (subscriptions.isEmpty()) {
+                subscriptionAutoRefreshJob = null
+                return@launchWhenStarted
+            }
+
+            lastSubscriptionAutoRefreshAt = SystemClock.elapsedRealtime()
+            try {
+                withContext(Dispatchers.IO) {
+                    subscriptions.forEach { group ->
+                        if (group.id !in GroupUpdater.updating) {
+                            GroupUpdater.executeUpdate(group, byUser = false)
+                        }
+                    }
+                }
+                refreshSubscriptionCard()
+            } finally {
+                subscriptionAutoRefreshJob = null
+            }
+        }
+    }
+
     override fun onStop() {
         connection.bandwidthTimeout = 0
         GroupManager.userInterface = null
@@ -956,6 +1035,8 @@ class MainActivity : ThemedActivity(),
 
     override fun onDestroy() {
         cancelSmartConnect()
+        subscriptionAutoRefreshJob?.cancel()
+        cancelSubscriptionNavReveal()
         super.onDestroy()
         DataStore.configurationStore.unregisterChangeListener(this)
         connection.disconnect(this)
@@ -981,6 +1062,11 @@ class MainActivity : ThemedActivity(),
 
         val fragment = supportFragmentManager.findFragmentById(R.id.fragment_holder) as? ToolbarFragment
         return fragment != null && fragment.onKeyDown(keyCode, event)
+    }
+
+    companion object {
+        private const val SUBSCRIPTION_ENTRY_HOLD_MS = 10_000L
+        private const val SUBSCRIPTION_REFRESH_GUARD_MS = 30_000L
     }
 
 }

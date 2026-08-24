@@ -22,11 +22,12 @@ package io.nekohasekai.sagernet.ui
 import android.content.Intent
 import android.os.Bundle
 import android.text.format.DateUtils
+import android.view.MotionEvent
 import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
+import android.widget.ImageView
 import android.widget.LinearLayout
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.widget.PopupMenu
 import androidx.appcompat.widget.Toolbar
 import androidx.core.view.*
@@ -42,7 +43,6 @@ import io.nekohasekai.sagernet.database.GroupManager
 import io.nekohasekai.sagernet.database.ProxyGroup
 import io.nekohasekai.sagernet.database.SagerDatabase
 import io.nekohasekai.sagernet.databinding.LayoutGroupItemBinding
-import io.nekohasekai.sagernet.fmt.exportBackup
 import io.nekohasekai.sagernet.group.GroupUpdater
 import io.nekohasekai.sagernet.ktx.*
 import io.nekohasekai.sagernet.utils.FormatFileSizeCompat
@@ -57,7 +57,6 @@ class GroupFragment : ToolbarFragment(R.layout.layout_group),
     lateinit var layoutManager: LinearLayoutManager
     lateinit var groupAdapter: GroupAdapter
     lateinit var undoManager: UndoSnackbarManager<ProxyGroup>
-    val showBackup = DataStore.experimentalFlagsProperties.getBooleanProperty("enableProfileBackup")
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
@@ -96,7 +95,8 @@ class GroupFragment : ToolbarFragment(R.layout.layout_group),
                 viewHolder: RecyclerView.ViewHolder
             ): Int {
                 val proxyGroup = (viewHolder as GroupHolder).proxyGroup
-                if (proxyGroup.ungrouped || proxyGroup.id in GroupUpdater.updating) {
+                if (proxyGroup.ungrouped || proxyGroup.type == GroupType.SUBSCRIPTION ||
+                    proxyGroup.id in GroupUpdater.updating) {
                     return 0
                 }
                 return super.getSwipeDirs(recyclerView, viewHolder)
@@ -162,68 +162,6 @@ class GroupFragment : ToolbarFragment(R.layout.layout_group),
         return true
     }
 
-    private lateinit var selectedGroup: ProxyGroup
-
-    private val exportProfiles = registerForActivityResult(ActivityResultContracts.CreateDocument()) { data ->
-        if (data != null) {
-            runOnDefaultDispatcher {
-                val profiles = SagerDatabase.proxyDao.getByGroup(selectedGroup.id)
-                val links = profiles.mapNotNull {
-                    try {
-                        it.toLink()
-                    } catch (_: Exception) {
-                        null
-                    }
-                }.joinToString("\n")
-                try {
-                    (requireActivity() as MainActivity).contentResolver.openOutputStream(
-                        data
-                    )!!.bufferedWriter().use {
-                        it.write(links)
-                    }
-                    onMainDispatcher {
-                        snackbar(getString(R.string.action_export_msg)).show()
-                    }
-                } catch (e: Exception) {
-                    Logs.w(e)
-                    onMainDispatcher {
-                        snackbar(e.readableMessage).show()
-                    }
-                }
-
-            }
-        }
-    }
-
-    private val exportBackupOfAllProfiles = registerForActivityResult(ActivityResultContracts.CreateDocument()) { data ->
-        if (data != null) {
-            runOnDefaultDispatcher {
-                val profiles = SagerDatabase.proxyDao.getByGroup(selectedGroup.id)
-                val links = profiles.mapNotNull {
-                    if (it.canExportBackup()) {
-                        it.requireBean().exportBackup()
-                    } else null
-                }.joinToString("\n")
-                try {
-                    (requireActivity() as MainActivity).contentResolver.openOutputStream(
-                        data
-                    )!!.bufferedWriter().use {
-                        it.write(links)
-                    }
-                    onMainDispatcher {
-                        snackbar(getString(R.string.action_export_msg)).show()
-                    }
-                } catch (e: Exception) {
-                    Logs.w(e)
-                    onMainDispatcher {
-                        snackbar(e.readableMessage).show()
-                    }
-                }
-
-            }
-        }
-    }
-
     inner class GroupAdapter : RecyclerView.Adapter<GroupHolder>(),
         GroupManager.Listener,
         UndoSnackbarManager.Interface<ProxyGroup> {
@@ -259,6 +197,11 @@ class GroupFragment : ToolbarFragment(R.layout.layout_group),
 
         override fun onBindViewHolder(holder: GroupHolder, position: Int) {
             holder.bind(groupList[position])
+        }
+
+        override fun onViewRecycled(holder: GroupHolder) {
+            holder.cancelSecretHold()
+            super.onViewRecycled(holder)
         }
 
         override fun getItemCount(): Int {
@@ -390,61 +333,10 @@ class GroupFragment : ToolbarFragment(R.layout.layout_group),
         val optionsButton = binding.options
         val updateButton = binding.groupUpdate
         val subscriptionUpdateProgress = binding.subscriptionUpdateProgress
+        private var secretHoldRunnable: Runnable? = null
 
         override fun onMenuItemClick(item: MenuItem): Boolean {
-            fun showCode(link: String) {
-                QRCodeDialog(link).showAllowingStateLoss(parentFragmentManager)
-            }
-
             when (item.itemId) {
-                R.id.action_subscription_link_qr -> {
-                    showCode(proxyGroup.subscription!!.link!!)
-                }
-                R.id.action_subscription_link_clipboard -> {
-                    val link = proxyGroup.subscription!!.link!!
-                    runOnDefaultDispatcher {
-                        onMainDispatcher {
-                            SagerNet.trySetPrimaryClip(link)
-                            snackbar(R.string.action_export_msg).show()
-                        }
-                    }
-                }
-                R.id.action_clipboard -> {
-                    runOnDefaultDispatcher {
-                        val profiles = SagerDatabase.proxyDao.getByGroup(proxyGroup.id)
-                        val links = profiles.mapNotNull {
-                            try {
-                                it.toLink()
-                            } catch (_: Exception) {
-                                null
-                            }
-                        }.joinToString("\n")
-                        onMainDispatcher {
-                            SagerNet.trySetPrimaryClip(links)
-                            snackbar(R.string.action_export_msg).show()
-                        }
-                    }
-                }
-                R.id.action_file -> {
-                    startFilesForResult(exportProfiles, "profiles_${proxyGroup.displayName()}.txt")
-                }
-                R.id.action_export_backup_of_all_profiles_clipboard -> {
-                    runOnDefaultDispatcher {
-                        val profiles = SagerDatabase.proxyDao.getByGroup(proxyGroup.id)
-                        val links = profiles.mapNotNull {
-                            if (it.canExportBackup()) {
-                                it.requireBean().exportBackup()
-                            } else null
-                        }.joinToString("\n")
-                        onMainDispatcher {
-                            SagerNet.trySetPrimaryClip(links)
-                            snackbar(R.string.action_export_msg).show()
-                        }
-                    }
-                }
-                R.id.action_export_backup_of_all_profiles_file -> {
-                    startFilesForResult(exportBackupOfAllProfiles, "profiles_${proxyGroup.displayName()}_backup.txt")
-                }
                 R.id.action_clear -> {
                     MaterialAlertDialogBuilder(requireContext()).setTitle(R.string.confirm)
                         .setMessage(R.string.clear_profiles_message)
@@ -461,15 +353,46 @@ class GroupFragment : ToolbarFragment(R.layout.layout_group),
             return true
         }
 
+        fun cancelSecretHold() {
+            secretHoldRunnable?.let(itemView::removeCallbacks)
+            secretHoldRunnable = null
+        }
+
+        private fun installSecretHold(group: ProxyGroup) {
+            cancelSecretHold()
+            if (group.type != GroupType.SUBSCRIPTION) {
+                itemView.setOnTouchListener(null)
+                return
+            }
+            itemView.setOnTouchListener { view, event ->
+                when (event.actionMasked) {
+                    MotionEvent.ACTION_DOWN -> {
+                        cancelSecretHold()
+                        val reveal = Runnable {
+                            secretHoldRunnable = null
+                            if (view.isAttachedToWindow && proxyGroup.id == group.id) {
+                                revealSubscription(group)
+                            }
+                        }
+                        secretHoldRunnable = reveal
+                        view.postDelayed(reveal, SUBSCRIPTION_SECRET_HOLD_MS)
+                    }
+                    MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> cancelSecretHold()
+                }
+                false
+            }
+        }
+
         fun bind(group: ProxyGroup) {
             proxyGroup = group
 
             itemView.setOnClickListener(null)
 
-            editButton.isGone = group.ungrouped
+            editButton.isGone = group.ungrouped || group.type == GroupType.SUBSCRIPTION
             updateButton.isVisible = group.type == GroupType.SUBSCRIPTION
             optionsButton.isGone = false
             groupName.text = group.displayName()
+            installSecretHold(group)
 
             editButton.setOnClickListener {
                 startActivity(Intent(it.context, GroupSettingsActivity::class.java).apply {
@@ -482,19 +405,8 @@ class GroupFragment : ToolbarFragment(R.layout.layout_group),
             }
 
             optionsButton.setOnClickListener {
-                selectedGroup = group
-
                 val popup = PopupMenu(requireContext(), it)
                 popup.menuInflater.inflate(R.menu.group_action_menu, popup.menu)
-
-                if (group.type != GroupType.SUBSCRIPTION) {
-                    popup.menu.findItem(R.id.action_share).subMenu?.removeItem(R.id.action_export_backup)
-                    popup.menu.findItem(R.id.action_share).subMenu?.removeItem(R.id.action_subscription_link)
-                }
-
-                if (showBackup) {
-                    popup.menu.findItem(R.id.action_export_backup_of_all_profiles).isVisible = true
-                }
 
                 popup.setOnMenuItemClickListener(this)
                 popup.show()
@@ -526,7 +438,7 @@ class GroupFragment : ToolbarFragment(R.layout.layout_group),
 
                 subscriptionUpdateProgress.isVisible = false
                 updateButton.isVisible = group.type == GroupType.SUBSCRIPTION
-                editButton.isGone = group.ungrouped
+                editButton.isGone = group.ungrouped || group.type == GroupType.SUBSCRIPTION
             }
 
             if (group.type == GroupType.SUBSCRIPTION) {
@@ -614,6 +526,52 @@ class GroupFragment : ToolbarFragment(R.layout.layout_group),
             }
 
         }
+    }
+
+    private fun revealSubscription(group: ProxyGroup) {
+        val link = group.subscription?.link?.takeIf { it.isNotBlank() }
+        if (link == null) {
+            copyAllGroupConfigs(group)
+            return
+        }
+        val size = dp2px(264)
+        val image = ImageView(requireContext()).apply {
+            setImageBitmap(QRCodeDialog.createBitmap(link, size))
+            adjustViewBounds = true
+            layoutParams = ViewGroup.LayoutParams(size, size)
+        }
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle(group.displayName())
+            .setView(image)
+            .setPositiveButton(R.string.mobiletina_copy_subscription_link) { _, _ ->
+                val success = SagerNet.trySetPrimaryClip(link)
+                snackbar(if (success) R.string.action_export_msg else R.string.action_export_err).show()
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun copyAllGroupConfigs(group: ProxyGroup) {
+        runOnDefaultDispatcher {
+            val links = SagerDatabase.proxyDao.getByGroup(group.id).mapNotNull { profile ->
+                runCatching { profile.toLink() }.getOrNull()
+            }.joinToString("\n")
+            onMainDispatcher {
+                if (links.isBlank()) {
+                    snackbar(R.string.no_proxies_found).show()
+                } else {
+                    val success = SagerNet.trySetPrimaryClip(links)
+                    snackbar(
+                        if (success) R.string.mobiletina_all_configs_copied
+                        else R.string.action_export_err
+                    ).show()
+                }
+            }
+        }
+    }
+
+    companion object {
+        private const val SUBSCRIPTION_SECRET_HOLD_MS = 10_000L
     }
 
 }

@@ -16,4 +16,6 @@
     <color name="mobiletina_about_stroke">#DDE0E7</color>
     <color name="mobiletina_about_text">#17181C</color>
     <color name="mobiletina_about_secondary">#60646F</color>
+    <color name="mobiletina_header_icon">#111214</color>
+    <color name="mobiletina_primary_content">#111214</color>
 </resources>

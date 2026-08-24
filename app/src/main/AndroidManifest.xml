@@ -96,10 +96,6 @@
         android:enableOnBackInvokedCallback="true"
         tools:targetApi="33"
         tools:ignore="Deprecated">
-        <meta-data
-            android:name="android.app.shortcuts"
-            android:resource="@xml/shortcuts" />
-
         <activity
             android:name="io.nekohasekai.sagernet.ui.MainActivity"
             android:exported="true"
@@ -153,9 +149,6 @@
                 <data android:scheme="shadowquic" />
             </intent-filter>
 
-            <meta-data
-                android:name="android.app.shortcuts"
-                android:resource="@xml/shortcuts" />
         </activity>
         <activity
             android:name="io.nekohasekai.sagernet.ui.VpnRequestActivity"
@@ -221,19 +214,6 @@
             android:name="com.github.shadowsocks.plugin.v2ray.ConfigActivity" />
         <activity
             android:name="com.github.shadowsocks.plugin.obfs_local.ConfigActivity" />
-        <activity
-            android:name=".QuickToggleShortcut"
-            android:excludeFromRecents="true"
-            android:exported="true"
-            android:label="@string/quick_toggle"
-            android:launchMode="singleTask"
-            android:process=":bg"
-            android:taskAffinity=""
-            android:theme="@android:style/Theme.Translucent.NoTitleBar">
-            <intent-filter>
-                <action android:name="android.intent.action.CREATE_SHORTCUT" />
-            </intent-filter>
-        </activity>
         <activity
             android:name="io.nekohasekai.sagernet.ui.AppManagerActivity"
             android:excludeFromRecents="true"
