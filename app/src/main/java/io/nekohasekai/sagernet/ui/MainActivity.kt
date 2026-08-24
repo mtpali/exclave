@@ -98,6 +98,7 @@ class MainActivity : ThemedActivity(),
     private var smartConnectJob: Job? = null
     private var smartConnectGeneration = 0L
     private var swipeDownX = 0f
+    private var swipeDownY = 0f
     private var showingHome = true
 
     override val onBackPressedCallback = object : OnBackPressedCallback(enabled = false) {
@@ -144,19 +145,18 @@ class MainActivity : ThemedActivity(),
         binding.mobiletinaAdd.setOnClickListener {
             setHomeMode(HomeMode.MANUAL)
             (supportFragmentManager.findFragmentById(R.id.fragment_holder) as? ConfigurationFragment)
-                ?.openMobileTinaAddMenu()
+                ?.openMobileTinaAddMenu(binding.mobiletinaAdd)
         }
         binding.mobiletinaMore.setOnClickListener {
             setHomeMode(HomeMode.MANUAL)
             (supportFragmentManager.findFragmentById(R.id.fragment_holder) as? ConfigurationFragment)
-                ?.openMobileTinaMoreMenu()
+                ?.openMobileTinaMoreMenu(binding.mobiletinaMore)
         }
         binding.btnModeAuto.setOnClickListener { setHomeMode(HomeMode.AUTO) }
         binding.btnModeManual.setOnClickListener { setHomeMode(HomeMode.MANUAL) }
         binding.fabAuto.setOnClickListener { smartConnectOrStop() }
         binding.fabManual.setOnClickListener { toggleService() }
         binding.btnSmartConnect.setOnClickListener { smartConnectOrStop() }
-        binding.modeContainer.setOnTouchListener { _, event -> handleModeSwipe(event) }
         if (resources.configuration.layoutDirection == View.LAYOUT_DIRECTION_RTL) {
             ViewCompat.setOnApplyWindowInsetsListener(navigation) { v, insets ->
                 val bars = insets.getInsets(
@@ -331,12 +331,33 @@ class MainActivity : ThemedActivity(),
             MotionEvent.ACTION_UP -> {
                 val delta = event.x - swipeDownX
                 if (kotlin.math.abs(delta) >= dp2px(72)) {
-                    setHomeMode(if (delta < 0) HomeMode.AUTO else HomeMode.MANUAL)
+                    setHomeMode(if (delta < 0) HomeMode.MANUAL else HomeMode.AUTO)
                     return true
                 }
             }
         }
         return false
+    }
+
+    override fun dispatchTouchEvent(event: MotionEvent): Boolean {
+        if (showingHome) {
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    swipeDownX = event.x
+                    swipeDownY = event.y
+                }
+                MotionEvent.ACTION_UP -> {
+                    val dx = event.x - swipeDownX
+                    val dy = event.y - swipeDownY
+                    if (kotlin.math.abs(dx) >= dp2px(84) &&
+                        kotlin.math.abs(dx) > kotlin.math.abs(dy) * 1.35f) {
+                        setHomeMode(if (dx < 0) HomeMode.MANUAL else HomeMode.AUTO)
+                        return true
+                    }
+                }
+            }
+        }
+        return super.dispatchTouchEvent(event)
     }
 
     private fun setHomeMode(mode: HomeMode) {
@@ -354,6 +375,20 @@ class MainActivity : ThemedActivity(),
         styleModeButton(binding.btnModeAuto, auto)
         styleModeButton(binding.btnModeManual, !auto)
         if (showingHome && auto) refreshSubscriptionCard()
+        if (showingHome && !auto) ensureLatencyOrder()
+    }
+
+    private fun ensureLatencyOrder() {
+        lifecycleScope.launchWhenStarted {
+            withContext(Dispatchers.IO) {
+                val group = SagerDatabase.groupDao.getById(DataStore.currentGroupId())
+                    ?: return@withContext
+                if (group.order != GroupOrder.BY_DELAY) {
+                    group.order = GroupOrder.BY_DELAY
+                    GroupManager.updateGroup(group, reconfigureUpdater = false)
+                }
+            }
+        }
     }
 
     private fun refreshSubscriptionCard() {

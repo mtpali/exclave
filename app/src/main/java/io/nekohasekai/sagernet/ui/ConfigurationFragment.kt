@@ -26,6 +26,7 @@ import android.graphics.Color
 import android.os.Bundle
 import android.provider.OpenableColumns
 import android.view.*
+import android.view.Gravity
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -110,12 +111,20 @@ class ConfigurationFragment @JvmOverloads constructor(
         }
     }
 
-    fun openMobileTinaAddMenu() {
-        toolbar.findViewById<View>(R.id.action_add_profile)?.performClick()
+    fun openMobileTinaAddMenu(anchor: View) {
+        PopupMenu(requireContext(), anchor, Gravity.END).apply {
+            menuInflater.inflate(R.menu.mobiletina_add_menu, menu)
+            setOnMenuItemClickListener(this@ConfigurationFragment)
+            show()
+        }
     }
 
-    fun openMobileTinaMoreMenu() {
-        toolbar.showOverflowMenu()
+    fun openMobileTinaMoreMenu(anchor: View) {
+        PopupMenu(requireContext(), anchor, Gravity.END).apply {
+            menuInflater.inflate(R.menu.mobiletina_more_menu, menu)
+            setOnMenuItemClickListener(this@ConfigurationFragment)
+            show()
+        }
     }
 
     val onBackPressedCallback = object : OnBackPressedCallback(enabled = false) {
@@ -700,8 +709,22 @@ class ConfigurationFragment @JvmOverloads constructor(
                     }
                 }
             }
+            R.id.action_order_origin -> updateMobileTinaOrder(GroupOrder.ORIGIN)
+            R.id.action_order_by_name -> updateMobileTinaOrder(GroupOrder.BY_NAME)
+            R.id.action_order_by_delay -> updateMobileTinaOrder(GroupOrder.BY_DELAY)
         }
         return true
+    }
+
+    private fun updateMobileTinaOrder(order: Int) {
+        runOnDefaultDispatcher {
+            val group = SagerDatabase.groupDao.getById(DataStore.currentGroupId())
+                ?: return@runOnDefaultDispatcher
+            if (group.order != order) {
+                group.order = order
+                GroupManager.updateGroup(group, reconfigureUpdater = false)
+            }
+        }
     }
 
     inner class TestDialog {
@@ -1642,6 +1665,9 @@ class ConfigurationFragment @JvmOverloads constructor(
 
                 profileAddress.text = address
                 (trafficText.parent as View).isGone = (!showTraffic || proxyEntity.status <= 0) && address.isEmpty()
+                if (parent.mobileTinaPresentation) {
+                    (trafficText.parent as View).isGone = true
+                }
 
                 if (proxyEntity.status <= 0) {
                     if (showTraffic) {
