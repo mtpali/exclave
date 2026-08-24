@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- MobileTina UI v5 palette: high-contrast in both light and dark modes. -->
+    <!-- MobileTina UI v5 palette: high-contrast in light and dark modes. -->
     <color name="mobiletina_mode_surface">#F1F2F6</color>
     <color name="mobiletina_mode_selected">#17181C</color>
     <color name="mobiletina_mode_unselected">#F1F2F6</color>
