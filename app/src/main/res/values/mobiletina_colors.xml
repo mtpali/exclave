@@ -4,9 +4,9 @@
     <color name="mobiletina_mode_selected">#17181C</color>
     <color name="mobiletina_mode_unselected">#F1F2F6</color>
     <color name="mobiletina_mode_text_selected">#FFFFFF</color>
-    <color name="mobiletina_mode_text_unselected">#5F636D</color>
+    <color name="mobiletina_mode_text_unselected">#343740</color>
     <color name="mobiletina_mode_stroke">#DDE0E7</color>
-    <color name="mobiletina_status_secondary">#5F636D</color>
+    <color name="mobiletina_status_secondary">#343740</color>
     <color name="mobiletina_manual_dock_bg">#FFFFFF</color>
-    <color name="mobiletina_manual_dock_text">#5F636D</color>
+    <color name="mobiletina_manual_dock_text">#343740</color>
 </resources>

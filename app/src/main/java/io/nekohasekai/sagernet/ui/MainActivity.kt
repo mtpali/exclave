@@ -32,6 +32,7 @@ import android.os.RemoteException
 import android.provider.Settings
 import android.text.util.Linkify
 import android.view.KeyEvent
+import android.view.Gravity
 import android.view.MenuItem
 import android.view.MotionEvent
 import android.view.View
@@ -198,6 +199,10 @@ class MainActivity : ThemedActivity(),
 
         setContentView(binding.root)
 
+        if (savedInstanceState != null) {
+            showingHome = supportFragmentManager.findFragmentById(R.id.fragment_holder) is ConfigurationFragment
+        }
+
         changeState(BaseService.State.Idle)
         setHomeMode(HomeMode.AUTO)
         connection.connect(this, this)
@@ -288,12 +293,12 @@ class MainActivity : ThemedActivity(),
     private suspend fun testAndSelectBest(
         profiles: List<ProxyEntity>, generation: Long,
     ): ProxyEntity? = coroutineScope {
-        val semaphore = Semaphore(4)
+        val semaphore = Semaphore(6)
         suspend fun test(profile: ProxyEntity): ProxyEntity? = semaphore.withPermit {
             if (generation != smartConnectGeneration) return@withPermit null
             runCatching {
                 val result = V2RayTestInstance(
-                    profile, DataStore.connectionTestURL, 5_000
+                    profile, DataStore.connectionTestURL, 3_500
                 ).use { it.doTest() }
                 profile.status = 1
                 profile.ping = result
@@ -310,7 +315,7 @@ class MainActivity : ThemedActivity(),
         }
         var working = profiles.map { async(Dispatchers.IO) { test(it) } }.awaitAll().filterNotNull()
         if (working.isEmpty() && generation == smartConnectGeneration) {
-            delay(1_000L)
+            delay(350L)
             working = profiles.map { async(Dispatchers.IO) { test(it) } }.awaitAll().filterNotNull()
         }
         working.minByOrNull { it.ping }
@@ -335,7 +340,7 @@ class MainActivity : ThemedActivity(),
             MotionEvent.ACTION_UP -> {
                 val delta = event.x - swipeDownX
                 if (kotlin.math.abs(delta) >= dp2px(72)) {
-                    setHomeMode(if (delta < 0) HomeMode.MANUAL else HomeMode.AUTO)
+                    setHomeMode(if (delta < 0) HomeMode.AUTO else HomeMode.MANUAL)
                     return true
                 }
             }
@@ -355,7 +360,7 @@ class MainActivity : ThemedActivity(),
                     val dy = event.y - swipeDownY
                     if (kotlin.math.abs(dx) >= dp2px(84) &&
                         kotlin.math.abs(dx) > kotlin.math.abs(dy) * 1.35f) {
-                        setHomeMode(if (dx < 0) HomeMode.MANUAL else HomeMode.AUTO)
+                        setHomeMode(if (dx < 0) HomeMode.AUTO else HomeMode.MANUAL)
                         return true
                     }
                 }
@@ -520,6 +525,9 @@ class MainActivity : ThemedActivity(),
         view.layoutDirection = View.LAYOUT_DIRECTION_LTR
         view.textDirection = View.TEXT_DIRECTION_LTR
         view.textAlignment = View.TEXT_ALIGNMENT_VIEW_START
+        if (view is TextView) {
+            view.gravity = Gravity.START or Gravity.CENTER_VERTICAL
+        }
         if (view is ViewGroup) {
             for (index in 0 until view.childCount) forceLtrTree(view.getChildAt(index))
         }
@@ -577,6 +585,16 @@ class MainActivity : ThemedActivity(),
     }
 
     override fun onNavigationItemSelected(item: MenuItem): Boolean {
+        if (item.itemId == R.id.nav_clear_all) {
+            binding.drawerLayout.closeDrawers()
+            MaterialAlertDialogBuilder(this)
+                .setTitle(R.string.mobiletina_clear_all)
+                .setMessage(R.string.mobiletina_clear_all_message)
+                .setNegativeButton(android.R.string.cancel, null)
+                .setPositiveButton(R.string.mobiletina_clear_all_confirm) { _, _ -> clearAllConfigurations() }
+                .show()
+            return true
+        }
         if (item.itemId == R.id.nav_per_app) {
             startActivity(Intent(this, AppManagerActivity::class.java))
             binding.drawerLayout.closeDrawers()
@@ -586,6 +604,19 @@ class MainActivity : ThemedActivity(),
             return displayFragmentWithId(item.itemId)
         }
         return true
+    }
+
+    private fun clearAllConfigurations() {
+        if (state.canStop) SagerNet.stopService()
+        lifecycleScope.launchWhenStarted {
+            withContext(Dispatchers.IO) {
+                GroupManager.deleteGroup(SagerDatabase.groupDao.allGroups())
+                DataStore.selectedGroup = 0L
+                DataStore.selectedProxy = 0L
+            }
+            displayFragmentWithId(R.id.nav_configuration)
+            setHomeMode(HomeMode.AUTO)
+        }
     }
 
 
@@ -686,12 +717,18 @@ class MainActivity : ThemedActivity(),
         }
         binding.fabAuto.setImageResource(image)
         binding.tvAutoStatus.setText(status)
-        if (!profileName.isNullOrBlank()) binding.tvAutoServer.text = profileName
+        val visibleProfile = profileName?.takeUnless { it.equals("Idle", ignoreCase = true) }
+        if (state == BaseService.State.Idle || state == BaseService.State.Stopped) {
+            binding.tvAutoServer.text = ""
+            binding.tvManualSelected.text = ""
+        } else if (!visibleProfile.isNullOrBlank()) {
+            binding.tvAutoServer.text = visibleProfile
+            binding.tvManualSelected.text = visibleProfile
+        }
         binding.fabManual.setImageResource(
             if (state == BaseService.State.Connected) R.drawable.mt_manual_fab
             else R.drawable.mt_manual_stop
         )
-        if (!profileName.isNullOrBlank()) binding.tvManualSelected.text = profileName
     }
 
     override fun snackbarInternal(text: CharSequence): Snackbar {

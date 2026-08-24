@@ -968,7 +968,7 @@ class ConfigurationFragment @JvmOverloads constructor(
                 }
                 val hasSubscription = newGroupList.any { it.type == GroupType.SUBSCRIPTION }
                 newGroupList.find { it.ungrouped }?.let {
-                    if (hasSubscription || SagerDatabase.proxyDao.countByGroup(it.id) == 0L) {
+                    if (hasSubscription && SagerDatabase.proxyDao.countByGroup(it.id) == 0L) {
                         newGroupList.remove(it)
                     }
                 }
@@ -1696,7 +1696,29 @@ class ConfigurationFragment @JvmOverloads constructor(
                         alert(proxyEntity.error ?: "<?>").show()
                     }
                 } else {
-                    profileStatus.setOnClickListener(null)
+                    profileStatus.setOnClickListener {
+                        if (SagerNet.started) {
+                            profileStatus.setText(R.string.connection_test_testing)
+                            runOnDefaultDispatcher {
+                                try {
+                                    val instance = if (DataStore.tunImplementation == TunImplementation.SYSTEM &&
+                                        DataStore.serviceMode == Key.MODE_VPN && DataStore.startedProfile > 0) {
+                                        V2RayTestInstance(proxyEntity, DataStore.connectionTestURL, 3_500,
+                                            protectPath = SagerNet.deviceStorage.noBackupFilesDir.toString() + "/protect_path")
+                                    } else V2RayTestInstance(proxyEntity, DataStore.connectionTestURL, 3_500)
+                                    proxyEntity.ping = instance.use { it.doTest() }
+                                    proxyEntity.status = 1
+                                    proxyEntity.error = null
+                                } catch (error: Exception) {
+                                    proxyEntity.status = 3
+                                    proxyEntity.ping = 0
+                                    proxyEntity.error = error.readableMessage
+                                }
+                                ProfileManager.updateProfile(proxyEntity)
+                                onMainDispatcher { notifyItemChanged(bindingAdapterPosition) }
+                            }
+                        }
+                    }
                 }
 
                 editButton.setOnClickListener {

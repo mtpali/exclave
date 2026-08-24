@@ -42,8 +42,6 @@ import io.nekohasekai.sagernet.aidl.TrafficStats
 import io.nekohasekai.sagernet.database.DataStore
 import io.nekohasekai.sagernet.ktx.app
 import io.nekohasekai.sagernet.ktx.getColorAttr
-import io.nekohasekai.sagernet.ui.SwitchActivity
-import io.nekohasekai.sagernet.utils.FormatFileSizeCompat
 import io.nekohasekai.sagernet.utils.Theme
 
 /**
@@ -65,50 +63,15 @@ class ServiceNotification(
         val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0
     }
 
-    val trafficStatistics = DataStore.profileTrafficStatistics
-    val showDirectSpeed = DataStore.showDirectSpeed
+    // Bandwidth callbacks are intentionally disabled: MobileTina does not expose traffic speed
+    // in the foreground notification, which also avoids needless periodic IPC work.
+    val trafficStatistics = false
 
     private val callback: ISagerNetServiceCallback by lazy {
         object : ISagerNetServiceCallback.Stub() {
             override fun stateChanged(state: Int, profileName: String?, msg: String?) {}   // ignore
             override fun trafficUpdated(profileId: Long, stats: TrafficStats, isCurrent: Boolean) {
-                if (!trafficStatistics || profileId == 0L || !isCurrent) return
-                builder.apply {
-                    if (showDirectSpeed) {
-                        val speedDetail = (service as Context).getString(
-                            R.string.speed_detail, service.getString(
-                                R.string.speed, FormatFileSizeCompat.formatFileSize(service, stats.txRateProxy, DataStore.useIECUnit)
-                            ), service.getString(
-                                R.string.speed, FormatFileSizeCompat.formatFileSize(service, stats.rxRateProxy, DataStore.useIECUnit)
-                            ), service.getString(
-                                R.string.speed,
-                                FormatFileSizeCompat.formatFileSize(service, stats.txRateDirect, DataStore.useIECUnit)
-                            ), service.getString(
-                                R.string.speed,
-                                FormatFileSizeCompat.formatFileSize(service, stats.rxRateDirect, DataStore.useIECUnit)
-                            )
-                        )
-                        setStyle(NotificationCompat.BigTextStyle().bigText(speedDetail))
-                        setContentText(speedDetail)
-                    } else {
-                        val speedSimple = (service as Context).getString(
-                            R.string.traffic, service.getString(
-                                R.string.speed, FormatFileSizeCompat.formatFileSize(service, stats.txRateProxy, DataStore.useIECUnit)
-                            ), service.getString(
-                                R.string.speed, FormatFileSizeCompat.formatFileSize(service, stats.rxRateProxy, DataStore.useIECUnit)
-                            )
-                        )
-                        setContentText(speedSimple)
-                    }
-                    setSubText(
-                        service.getString(
-                            R.string.traffic,
-                            FormatFileSizeCompat.formatFileSize(service, stats.txTotal, DataStore.useIECUnit),
-                            FormatFileSizeCompat.formatFileSize(service, stats.rxTotal, DataStore.useIECUnit)
-                        )
-                    )
-                }
-                update()
+                // MobileTina deliberately keeps the foreground notification quiet and compact.
             }
 
             override fun statsUpdated(statsList: AppStatsList?) {
@@ -175,7 +138,7 @@ class ServiceNotification(
 
         builder.clearActions()
         val closeAction = NotificationCompat.Action.Builder(
-            0, service.getText(R.string.stop), PendingIntent.getBroadcast(
+            0, service.getText(R.string.mobiletina_notification_stop), PendingIntent.getBroadcast(
                 service, 0, Intent(Action.CLOSE).setPackage(service.packageName), flags
             )
         ).apply {
@@ -183,14 +146,6 @@ class ServiceNotification(
         }.build()
         builder.addAction(closeAction)
 
-        val switchAction = NotificationCompat.Action.Builder(
-            0, service.getString(R.string.quick_toggle), PendingIntent.getActivity(
-                service, 0, Intent(service, SwitchActivity::class.java), flags
-            )
-        ).apply {
-            setShowsUserInterface(false)
-        }.build()
-        builder.addAction(switchAction)
     }
 
     override fun onReceive(context: Context, intent: Intent) {

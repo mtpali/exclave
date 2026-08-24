@@ -25,7 +25,7 @@
                     <ImageButton android:id="@+id/mobiletina_scan" android:layout_width="52dp"
                         android:layout_height="52dp" android:background="?attr/selectableItemBackgroundBorderless"
                         android:contentDescription="@string/mobiletina_scan" android:padding="13dp"
-                        android:src="@drawable/ic_image_camera_alt" />
+                        android:src="@drawable/ic_image_camera_alt" android:tint="?android:attr/textColorPrimary" />
                     <ImageButton android:id="@+id/mobiletina_add" android:layout_width="52dp"
                         android:layout_height="52dp" android:background="?attr/selectableItemBackgroundBorderless"
                         android:contentDescription="@string/mobiletina_add" android:padding="13dp"
@@ -161,8 +161,8 @@
                 android:background="@color/mobiletina_manual_dock_bg"
                 android:clipChildren="false" android:clipToPadding="false" android:visibility="gone">
                 <com.google.android.material.imageview.ShapeableImageView
-                    android:id="@+id/fab_manual" android:layout_width="78dp" android:layout_height="78dp"
-                    android:layout_gravity="top|center_horizontal" android:translationY="-22dp"
+                    android:id="@+id/fab_manual" android:layout_width="88dp" android:layout_height="88dp"
+                    android:layout_gravity="top|center_horizontal" android:translationY="-27dp"
                     android:background="@android:color/transparent" android:clickable="true"
                     android:focusable="true" android:scaleType="fitCenter"
                     android:src="@drawable/mt_manual_stop" />
