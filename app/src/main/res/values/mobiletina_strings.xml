@@ -26,14 +26,10 @@
     <string name="mobiletina_about_branch_one" translatable="false">اینستاگرام شعبه اول · کتالم</string>
     <string name="mobiletina_about_branch_two" translatable="false">اینستاگرام شعبه دوم · رامسر</string>
     <string name="mobiletina_about_page_three" translatable="false">اینستاگرام سوم</string>
-    <string name="mobiletina_about_handle_one" translatable="false">@mobile.tina</string>
-    <string name="mobiletina_about_handle_two" translatable="false">@mobile.tina2</string>
-    <string name="mobiletina_about_handle_three" translatable="false">@mobile.tinaa</string>
     <string name="mobiletina_about_developer" translatable="false">توسعه‌دهنده برنامه</string>
-    <string name="mobiletina_about_developer_handle" translatable="false">Telegram: @vpn963</string>
     <string name="mobiletina_about_stores_title" translatable="false">آدرس فروشگاه</string>
-    <string name="mobiletina_about_store_one_full" translatable="false">شعبه اول: کتالم، جنب دبستان شهید بهشتی</string>
-    <string name="mobiletina_about_store_two_full" translatable="false">شعبه دوم: رامسر، ابریشم محله، جنب بانک رفاه</string>
+    <string name="mobiletina_about_store_one_full" translatable="false">شعبه اول : کتالم ، جنب دبستان شهید بهشتی</string>
+    <string name="mobiletina_about_store_two_full" translatable="false">شعبه دوم : رامسر ، ابریشم محله ، جنب بانک رفاه</string>
     <string name="mobiletina_welcome_message" translatable="false">instagram 1 : mobile.tina\n\ninstagram 2 : mobile.tina2\n\ninstagram 3 : mobile.tinaa</string>
     <string name="mobiletina_ping_testing" translatable="false">در حال بررسی پینگ…</string>
     <string name="mobiletina_ping_tap" translatable="false">بررسی پینگ</string>

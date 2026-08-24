@@ -51,6 +51,8 @@
     </style>
 
     <style name="Theme.SagerNet.Dialog" parent="Theme.MaterialComponents.DayNight.Dialog.Alert">
+        <item name="fontFamily">@font/text</item>
+        <item name="android:fontFamily">@font/text</item>
         <item name="actionBarStyle">@style/Widget.MaterialComponents.ActionBar.Solid</item>
         <item name="actionModeCloseDrawable">@drawable/ic_navigation_close</item>
         <item name="colorButtonNormal">?colorAccent</item>
@@ -519,6 +521,8 @@
     </style>
 
     <style name="Theme.SagerNet.Start" parent="Theme.MaterialComponents.Light.NoActionBar">
+        <item name="fontFamily">@font/text</item>
+        <item name="android:fontFamily">@font/text</item>
         <item name="android:windowBackground">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
         <item name="colorPrimary">@android:color/transparent</item>

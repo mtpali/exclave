@@ -16,8 +16,12 @@ class AboutFragment : ToolbarFragment(R.layout.layout_about) {
         super.onViewCreated(view, savedInstanceState)
 
         view.findViewById<View>(R.id.appbar).visibility = View.GONE
+        view.layoutDirection = View.LAYOUT_DIRECTION_RTL
+        view.textDirection = View.TEXT_DIRECTION_RTL
 
         ViewCompat.setOnApplyWindowInsetsListener(view.findViewById(R.id.layout_about)) { content, insets ->
+            content.layoutDirection = View.LAYOUT_DIRECTION_RTL
+            content.textDirection = View.TEXT_DIRECTION_RTL
             val bars = insets.getInsets(
                 WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout()
             )
