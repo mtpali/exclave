@@ -101,6 +101,7 @@ data class ProxyGroup(
     }
 
     fun displayName(): String {
+        if (ungrouped) return app.getString(R.string.mobiletina_subscription_name)
         return name.takeIf { !it.isNullOrEmpty() } ?: app.getString(R.string.group_default)
     }
 
