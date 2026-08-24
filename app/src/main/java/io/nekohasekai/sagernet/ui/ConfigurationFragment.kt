@@ -966,10 +966,12 @@ class ConfigurationFragment @JvmOverloads constructor(
                     SagerDatabase.groupDao.createGroup(ProxyGroup(ungrouped = true))
                     newGroupList = ArrayList(SagerDatabase.groupDao.allGroups())
                 }
-                val hasSubscription = newGroupList.any { it.type == GroupType.SUBSCRIPTION }
-                newGroupList.find { it.ungrouped }?.let {
-                    if (hasSubscription && SagerDatabase.proxyDao.countByGroup(it.id) == 0L) {
-                        newGroupList.remove(it)
+                val hasSubscription = newGroupList.any {
+                    it.type == GroupType.SUBSCRIPTION || it.subscription != null
+                }
+                if (hasSubscription) {
+                    newGroupList.removeAll { group ->
+                        group.ungrouped && SagerDatabase.proxyDao.countByGroup(group.id) == 0L
                     }
                 }
 
@@ -1036,7 +1038,7 @@ class ConfigurationFragment @JvmOverloads constructor(
         }
 
         override suspend fun groupAdd(group: ProxyGroup) {
-            if (group.type == GroupType.SUBSCRIPTION) {
+            if (group.type == GroupType.SUBSCRIPTION || group.subscription != null || group.ungrouped) {
                 reload()
                 return
             }
@@ -1068,7 +1070,8 @@ class ConfigurationFragment @JvmOverloads constructor(
         override suspend fun groupUpdated(groupId: Long) = Unit
 
         override suspend fun onAdd(profile: ProxyEntity) {
-            if (groupList.find { it.id == profile.groupId } == null) {
+            val group = SagerDatabase.groupDao.getById(profile.groupId)
+            if (group?.ungrouped == true || groupList.find { it.id == profile.groupId } == null) {
                 DataStore.selectedGroup = profile.groupId
                 reload()
             }
@@ -1079,7 +1082,7 @@ class ConfigurationFragment @JvmOverloads constructor(
         override suspend fun onUpdated(profile: ProxyEntity) = Unit
 
         override suspend fun onRemoved(groupId: Long, profileId: Long) {
-            val group = groupList.find { it.id == groupId } ?: return
+            val group = SagerDatabase.groupDao.getById(groupId) ?: return
             if (group.ungrouped && SagerDatabase.proxyDao.countByGroup(groupId) == 0L) {
                 reload()
             }
