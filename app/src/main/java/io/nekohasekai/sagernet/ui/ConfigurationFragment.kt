@@ -98,13 +98,24 @@ class ConfigurationFragment @JvmOverloads constructor(
     PopupMenu.OnMenuItemClickListener,
     Toolbar.OnMenuItemClickListener {
 
+    private var mobileTinaPresentation = false
+
     fun setMobileTinaPresentation(enabled: Boolean) {
+        mobileTinaPresentation = enabled
         if (!isAdded || view == null) return
         view?.findViewById<View>(R.id.appbar)?.isGone = enabled
         if (::groupPager.isInitialized) {
             groupPager.clipToPadding = false
             groupPager.setPadding(0, 0, 0, if (enabled) dp2px(112) else 0)
         }
+    }
+
+    fun openMobileTinaAddMenu() {
+        toolbar.findViewById<View>(R.id.action_add_profile)?.performClick()
+    }
+
+    fun openMobileTinaMoreMenu() {
+        toolbar.showOverflowMenu()
     }
 
     val onBackPressedCallback = object : OnBackPressedCallback(enabled = false) {
@@ -1683,9 +1694,9 @@ class ConfigurationFragment @JvmOverloads constructor(
                 editButton.suppressDragWhilePressed { actionButtonPressed = it }
                 shareLayout.suppressDragWhilePressed { actionButtonPressed = it }
 
-                editButton.isGone = parent.select
-                deleteButton.isGone = parent.select
-                shareButton.isGone = parent.select
+                editButton.isGone = parent.select || parent.mobileTinaPresentation
+                deleteButton.isGone = parent.select || parent.mobileTinaPresentation
+                shareButton.isGone = parent.select || parent.mobileTinaPresentation
 
                 runOnDefaultDispatcher {
                     val selected = (parent.selectedItem?.id
@@ -1725,7 +1736,7 @@ class ConfigurationFragment @JvmOverloads constructor(
                                 shareButton.setColorFilter(Color.GRAY)
 
                             }
-                            shareButton.isVisible = true
+                            shareButton.isVisible = !parent.mobileTinaPresentation
                             if (isInsecure) {
                                 shareLayout.setOnClickListener {
                                     MaterialAlertDialogBuilder(requireContext())

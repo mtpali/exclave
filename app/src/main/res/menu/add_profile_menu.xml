@@ -9,6 +9,7 @@
         app:showAsAction="always"
         tools:ignore="AlwaysShowAction" />
     <item
+        android:id="@+id/action_add_profile"
         android:alphabeticShortcut="n"
         android:icon="@drawable/ic_action_note_add"
         android:title="@string/add_profile"

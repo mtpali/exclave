@@ -138,6 +138,19 @@ class MainActivity : ThemedActivity(),
         }
         navigation.setNavigationItemSelectedListener(this)
         binding.mobiletinaMenu.setOnClickListener { binding.drawerLayout.open() }
+        binding.mobiletinaScan.setOnClickListener {
+            startActivity(Intent(this, ScannerActivity::class.java))
+        }
+        binding.mobiletinaAdd.setOnClickListener {
+            setHomeMode(HomeMode.MANUAL)
+            (supportFragmentManager.findFragmentById(R.id.fragment_holder) as? ConfigurationFragment)
+                ?.openMobileTinaAddMenu()
+        }
+        binding.mobiletinaMore.setOnClickListener {
+            setHomeMode(HomeMode.MANUAL)
+            (supportFragmentManager.findFragmentById(R.id.fragment_holder) as? ConfigurationFragment)
+                ?.openMobileTinaMoreMenu()
+        }
         binding.btnModeAuto.setOnClickListener { setHomeMode(HomeMode.AUTO) }
         binding.btnModeManual.setOnClickListener { setHomeMode(HomeMode.MANUAL) }
         binding.fabAuto.setOnClickListener { smartConnectOrStop() }
@@ -340,6 +353,37 @@ class MainActivity : ThemedActivity(),
             ?.setMobileTinaPresentation(!auto)
         styleModeButton(binding.btnModeAuto, auto)
         styleModeButton(binding.btnModeManual, !auto)
+        if (showingHome && auto) refreshSubscriptionCard()
+    }
+
+    private fun refreshSubscriptionCard() {
+        lifecycleScope.launchWhenStarted {
+            val group = withContext(Dispatchers.IO) {
+                SagerDatabase.groupDao.getById(DataStore.currentGroupId())
+            }
+            val subscription = group?.subscription
+            if (subscription == null) {
+                binding.subscriptionCard.visibility = View.GONE
+                return@launchWhenStarted
+            }
+            val used = subscription.bytesUsed.coerceAtLeast(0L)
+            val remaining = subscription.bytesRemaining.coerceAtLeast(0L)
+            val total = used + remaining
+            val gb = 1024.0 * 1024.0 * 1024.0
+            val days = if (subscription.expiryDate > 0L) {
+                (((subscription.expiryDate * 1000L) - System.currentTimeMillis()) / 86_400_000L)
+                    .coerceAtLeast(0L)
+            } else 0L
+            binding.subscriptionCard.visibility = View.VISIBLE
+            binding.tvSubscriptionName.text = group.displayName()
+            binding.tvSubscriptionDays.text = getString(R.string.mobiletina_days_remaining, days)
+            binding.tvSubscriptionTraffic.text = getString(
+                R.string.mobiletina_traffic_summary, used / gb, total / gb
+            )
+            binding.subscriptionProgress.progress = if (total > 0L) {
+                ((used * 100L) / total).toInt().coerceIn(0, 100)
+            } else 0
+        }
     }
 
     private fun styleModeButton(materialButton: MaterialButton, selected: Boolean) {

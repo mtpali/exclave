@@ -14,4 +14,9 @@
     <string name="mobiletina_menu_subscriptions" translatable="false">اشتراک‌ها</string>
     <string name="mobiletina_menu_per_app" translatable="false">فیلتر برنامه‌ها</string>
     <string name="mobiletina_menu_about" translatable="false">درباره فروشگاه</string>
+    <string name="mobiletina_app_title" translatable="false">فیلترشکن</string>
+    <string name="mobiletina_scan" translatable="false">اسکن کد</string>
+    <string name="mobiletina_add" translatable="false">افزودن سرور</string>
+    <string name="mobiletina_days_remaining" translatable="false">%1$d روز باقی‌مانده</string>
+    <string name="mobiletina_traffic_summary" translatable="false">%1$.1f GB / %2$.1f GB</string>
 </resources>
