@@ -42,8 +42,10 @@ import android.util.Log
 import android.view.inputmethod.InputMethodManager
 import android.widget.Toast
 import androidx.annotation.RequiresApi
+import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.content.ContextCompat
 import androidx.core.content.getSystemService
+import androidx.core.os.LocaleListCompat
 import go.Seq
 import io.nekohasekai.sagernet.bg.SagerConnection
 import io.nekohasekai.sagernet.bg.SubscriptionUpdater
@@ -68,6 +70,7 @@ import java.io.ByteArrayOutputStream
 import java.net.Inet6Address
 import java.net.InetSocketAddress
 import java.security.KeyStore
+import java.util.Locale
 import androidx.work.Configuration as WorkConfiguration
 
 class SagerNet : Application(),
@@ -76,7 +79,13 @@ class SagerNet : Application(),
     WorkConfiguration.Provider {
 
     override fun attachBaseContext(base: Context) {
-        super.attachBaseContext(base)
+        val english = Locale.forLanguageTag("en-US")
+        Locale.setDefault(english)
+        val configuration = Configuration(base.resources.configuration).apply {
+            setLocale(english)
+            setLayoutDirection(english)
+        }
+        super.attachBaseContext(base.createConfigurationContext(configuration))
         application = this
     }
 
@@ -84,6 +93,10 @@ class SagerNet : Application(),
 
     override fun onCreate() {
         super.onCreate()
+
+        if (AppCompatDelegate.getApplicationLocales().toLanguageTags() != "en-US") {
+            AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags("en-US"))
+        }
 
         System.setProperty(DEBUG_PROPERTY_NAME, DEBUG_PROPERTY_VALUE_ON)
         Thread.setDefaultUncaughtExceptionHandler(CrashHandler)

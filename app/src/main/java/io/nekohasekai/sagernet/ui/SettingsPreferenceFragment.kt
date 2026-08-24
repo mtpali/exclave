@@ -22,15 +22,12 @@ package io.nekohasekai.sagernet.ui
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.icu.util.ULocale
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.view.View
-import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.app.ActivityCompat
-import androidx.core.os.LocaleListCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.updatePadding
@@ -52,7 +49,6 @@ import io.nekohasekai.sagernet.widget.ColorPickerPreference
 import io.nekohasekai.sagernet.widget.LinkOrContentPreference
 import kotlinx.coroutines.delay
 import java.io.File
-import java.util.Locale
 
 class SettingsPreferenceFragment : PreferenceFragmentCompat() {
 
@@ -112,49 +108,6 @@ class SettingsPreferenceFragment : PreferenceFragmentCompat() {
             requireActivity().apply {
                 ActivityCompat.recreate(this)
             }
-            true
-        }
-
-        fun getLanguageDisplayName(code: String): String = run {
-            return when (code) {
-                "" -> getString(R.string.language_system_default)
-                "ar" -> getString(R.string.language_ar_display_name)
-                "cs" -> getString(R.string.language_cs_display_name)
-                "en-US" -> getString(R.string.language_en_display_name)
-                "es" -> getString(R.string.language_es_display_name)
-                "fa" -> getString(R.string.language_fa_display_name)
-                "fr" -> getString(R.string.language_fr_display_name)
-                "id" -> getString(R.string.language_id_display_name)
-                "it" -> getString(R.string.language_it_display_name)
-                "ja" -> getString(R.string.language_ja_display_name)
-                "ko" -> getString(R.string.language_ko_display_name)
-                "nb-NO" -> getString(R.string.language_nb_NO_display_name)
-                "ru" -> getString(R.string.language_ru_display_name)
-                "ta" -> getString(R.string.language_ta_display_name)
-                "tr" -> getString(R.string.language_tr_display_name)
-                "zh-Hans-CN" -> getString(R.string.language_zh_Hans_CN_display_name)
-                "zh-Hant-TW" -> getString(R.string.language_zh_Hant_TW_display_name)
-                else -> if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                    ULocale.forLanguageTag(code).displayName
-                } else {
-                    Locale.forLanguageTag(code).displayName
-                }
-            }
-        }
-        val appLanguage = findPreference<ListPreference>(Key.APP_LANGUAGE)!!
-        val locale = when (val value = AppCompatDelegate.getApplicationLocales().toLanguageTags()) {
-            // https://stackoverflow.com/questions/13291578/how-to-localize-an-android-app-in-indonesian-language
-            // Some old Android versions still return "in".
-            "in" -> "id"
-            else -> value
-        }
-        appLanguage.summary = getLanguageDisplayName(locale)
-        appLanguage.value = if (locale in resources.getStringArray(R.array.language_value)) locale else ""
-        appLanguage.setOnPreferenceChangeListener { _, newValue ->
-            newValue as String
-            AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags(newValue)) // "id" always works
-            appLanguage.summary = getLanguageDisplayName(newValue)
-            appLanguage.value = newValue
             true
         }
 

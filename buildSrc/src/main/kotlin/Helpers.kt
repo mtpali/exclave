@@ -185,6 +185,9 @@ fun Project.setupApp() {
         defaultConfig.applicationId = pkgName
         defaultConfig.versionCode = verCode
         defaultConfig.versionName = verName
+        // Keep one stable English/LTR layout regardless of the device locale. Branded
+        // MobileTina labels intentionally remain Persian in unqualified base resources.
+        defaultConfig.resourceConfigurations.add("en")
         buildTypes.getByName("release") {
             isMinifyEnabled = true
             isShrinkResources = true
