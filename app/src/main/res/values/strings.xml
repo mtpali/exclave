@@ -629,4 +629,4 @@
     <string name="mobiletina_clear_all_message" translatable="false">همه سرورها و لینک‌های اشتراک برای همیشه حذف شوند؟</string>
     <string name="mobiletina_clear_all_confirm" translatable="false">پاکسازی</string>
     <string name="mobiletina_notification_stop" translatable="false">خاموش کردن فیلترشکن</string>
-</resources>
+    <!-- ARMv7 build trigger for MobileTina v5. -->\n</resources>
