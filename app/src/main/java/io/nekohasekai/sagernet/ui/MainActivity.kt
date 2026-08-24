@@ -69,6 +69,7 @@ import io.nekohasekai.sagernet.fmt.AbstractBean
 import io.nekohasekai.sagernet.fmt.Alerts
 import io.nekohasekai.sagernet.fmt.PluginEntry
 import io.nekohasekai.sagernet.group.GroupInterfaceAdapter
+import io.nekohasekai.sagernet.group.GroupUpdater
 import io.nekohasekai.sagernet.ktx.*
 import io.nekohasekai.sagernet.utils.PackageCache
 import io.noties.markwon.Markwon
@@ -505,7 +506,6 @@ class MainActivity : ThemedActivity(),
     private suspend fun finishImportSubscription(subscription: ProxyGroup) {
         val created = GroupManager.createGroup(subscription)
         val subscriptionName = getString(R.string.mobiletina_subscription_name)
-        created.name = subscriptionName
         created.subscription?.name = subscriptionName
         GroupManager.updateGroup(created)
         DataStore.selectedGroup = created.id
