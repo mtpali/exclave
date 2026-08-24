@@ -30,7 +30,6 @@ import android.os.Build
 import android.os.Bundle
 import android.os.RemoteException
 import android.provider.Settings
-import android.text.util.Linkify
 import android.view.KeyEvent
 import android.view.Gravity
 import android.view.MenuItem
@@ -41,12 +40,10 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.annotation.IdRes
-import androidx.appcompat.app.AlertDialog
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
-import androidx.core.view.setPadding
 import androidx.core.view.updatePadding
 import androidx.lifecycle.lifecycleScope
 import androidx.preference.PreferenceDataStore
@@ -62,6 +59,7 @@ import io.nekohasekai.sagernet.aidl.ISagerNetService
 import io.nekohasekai.sagernet.aidl.TrafficStats
 import io.nekohasekai.sagernet.bg.BaseService
 import io.nekohasekai.sagernet.bg.SagerConnection
+import io.nekohasekai.sagernet.bg.SubscriptionUpdater
 import io.nekohasekai.sagernet.bg.test.V2RayTestInstance
 import io.nekohasekai.sagernet.database.*
 import io.nekohasekai.sagernet.database.preference.OnPreferenceDataStoreChangeListener
@@ -74,7 +72,6 @@ import io.nekohasekai.sagernet.group.GroupUpdater
 import io.nekohasekai.sagernet.ktx.*
 import io.nekohasekai.sagernet.utils.PackageCache
 import io.noties.markwon.Markwon
-import libexclavecore.Libexclavecore
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -84,6 +81,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 
 class MainActivity : ThemedActivity(),
     SagerConnection.Callback,
@@ -99,6 +97,8 @@ class MainActivity : ThemedActivity(),
 
     private var homeMode = HomeMode.AUTO
     private var smartConnectJob: Job? = null
+    private var pingRefreshJob: Job? = null
+    private var clearAllJob: Job? = null
     private var smartConnectGeneration = 0L
     private var swipeDownX = 0f
     private var swipeDownY = 0f
@@ -162,6 +162,7 @@ class MainActivity : ThemedActivity(),
         binding.fabAuto.setOnClickListener { smartConnectOrStop() }
         binding.fabManual.setOnClickListener { toggleService() }
         binding.btnSmartConnect.setOnClickListener { smartConnectOrStop() }
+        binding.tvAutoPing.setOnClickListener { refreshConnectedPing() }
         if (resources.configuration.layoutDirection == View.LAYOUT_DIRECTION_RTL) {
             ViewCompat.setOnApplyWindowInsetsListener(navigation) { v, insets ->
                 val bars = insets.getInsets(
@@ -213,37 +214,16 @@ class MainActivity : ThemedActivity(),
         }
 
         runOnMainDispatcher {
-            fun getLicenseKeyName(only: Boolean): String {
-                return if (only) "gplv3OnlyAccepted" else "gplv3OrLaterAccepted"
-            }
-            val only = Libexclavecore.buildWithClash()
-            if (DataStore.configurationStore.getBoolean(getLicenseKeyName(only)) != true) {
-                DataStore.configurationStore.putBoolean(getLicenseKeyName(only), true)
-                DataStore.configurationStore.remove(getLicenseKeyName(!only))
-                AlertDialog.Builder(this@MainActivity).apply {
-                    setTitle(R.string.license)
-                    setView(
-                        TextView(this@MainActivity).apply {
-                            setPadding(dp2px(16))
-                            text = getString(if (only) {
-                                R.string.license_gpl_v3_only
-                            } else {
-                                R.string.license_gpl_v3_or_later
-                            })
-                            setTextIsSelectable(true)
-                            Linkify.addLinks(this, Linkify.EMAIL_ADDRESSES or Linkify.WEB_URLS)
-                        }
-                    )
-                    setPositiveButton(android.R.string.ok) { _, _ ->
-                        requestPermissions()
-                    }
-                    setOnCancelListener { _ ->
-                        requestPermissions()
-                    }
-                }.show()
-            } else {
-                requestPermissions()
-            }
+            val welcomeKey = "mobileTinaWelcomeShownV7"
+            if (DataStore.configurationStore.getBoolean(welcomeKey) != true) {
+                DataStore.configurationStore.putBoolean(welcomeKey, true)
+                MaterialAlertDialogBuilder(this@MainActivity)
+                    .setTitle(R.string.mobiletina_app_title)
+                    .setMessage(R.string.mobiletina_welcome_message)
+                    .setCancelable(false)
+                    .setPositiveButton(android.R.string.ok) { _, _ -> requestPermissions() }
+                    .show()
+            } else requestPermissions()
         }
     }
 
@@ -607,15 +587,40 @@ class MainActivity : ThemedActivity(),
     }
 
     private fun clearAllConfigurations() {
-        if (state.canStop) SagerNet.stopService()
-        lifecycleScope.launchWhenStarted {
-            withContext(Dispatchers.IO) {
-                GroupManager.deleteGroup(SagerDatabase.groupDao.allGroups())
-                DataStore.selectedGroup = 0L
-                DataStore.selectedProxy = 0L
+        if (clearAllJob?.isActive == true) return
+        cancelSmartConnect()
+        clearAllJob = lifecycleScope.launchWhenStarted {
+            if (state.canStop) {
+                SagerNet.stopService()
+                withTimeoutOrNull(3_500L) {
+                    while (state.canStop) delay(100L)
+                }
             }
-            displayFragmentWithId(R.id.nav_configuration)
-            setHomeMode(HomeMode.AUTO)
+            val emptyGroupId = withContext(Dispatchers.IO) {
+                // Direct DAO operations avoid a storm of intermediate callbacks while the
+                // pager is still observing groups. Always leave one valid empty group behind.
+                SagerDatabase.proxyDao.reset()
+                SagerDatabase.groupDao.reset()
+                val groupId = SagerDatabase.groupDao.createGroup(
+                    ProxyGroup(
+                        userOrder = 1L,
+                        ungrouped = true,
+                        order = GroupOrder.BY_DELAY,
+                    )
+                )
+                DataStore.selectedGroup = groupId
+                DataStore.selectedProxy = 0L
+                DataStore.currentProfile = 0L
+                DataStore.startedProfile = 0L
+                SubscriptionUpdater.reconfigureUpdater()
+                groupId
+            }
+            if (emptyGroupId > 0L) {
+                displayFragmentWithId(R.id.nav_configuration)
+                setHomeMode(HomeMode.AUTO)
+                refreshSubscriptionCard()
+            }
+            clearAllJob = null
         }
     }
 
@@ -685,9 +690,9 @@ class MainActivity : ThemedActivity(),
 
         binding.fab.changeState(state, this.state, animate)
         binding.stats.changeState(state)
+        this.state = state
         updateMobileTinaState(state, failed = msg != null && state == BaseService.State.Stopped)
         if (msg != null) snackbar(msg).show()
-        this.state = state
 
         when (state) {
             BaseService.State.Connected, BaseService.State.Stopped -> {
@@ -721,9 +726,17 @@ class MainActivity : ThemedActivity(),
         if (state == BaseService.State.Idle || state == BaseService.State.Stopped) {
             binding.tvAutoServer.text = ""
             binding.tvManualSelected.text = ""
+            pingRefreshJob?.cancel()
+            binding.tvAutoPing.visibility = View.GONE
+            binding.tvAutoPing.text = ""
         } else if (!visibleProfile.isNullOrBlank()) {
             binding.tvAutoServer.text = visibleProfile
             binding.tvManualSelected.text = visibleProfile
+        }
+        if (state == BaseService.State.Connected && pingRefreshJob?.isActive != true) {
+            showStoredConnectedPing()
+        } else if (state != BaseService.State.Connected) {
+            binding.tvAutoPing.visibility = View.GONE
         }
         binding.fabManual.setImageResource(
             if (state == BaseService.State.Connected) R.drawable.mt_manual_fab
@@ -740,6 +753,46 @@ class MainActivity : ThemedActivity(),
     override fun stateChanged(state: BaseService.State, profileName: String?, msg: String?) {
         changeState(state, msg, true)
         updateMobileTinaState(state, profileName)
+    }
+
+    private fun showStoredConnectedPing() {
+        lifecycleScope.launchWhenStarted {
+            val profile = withContext(Dispatchers.IO) {
+                val id = DataStore.startedProfile.takeIf { it > 0L } ?: DataStore.selectedProxy
+                SagerDatabase.proxyDao.getById(id)
+            }
+            if (state != BaseService.State.Connected) return@launchWhenStarted
+            val ping = profile?.ping ?: 0
+            binding.tvAutoPing.apply {
+                visibility = View.VISIBLE
+                text = if (ping > 0) {
+                    "$ping ms"
+                } else getString(R.string.mobiletina_ping_tap)
+            }
+        }
+    }
+
+    private fun refreshConnectedPing() {
+        if (state != BaseService.State.Connected || pingRefreshJob?.isActive == true) {
+            if (state != BaseService.State.Connected) binding.tvAutoPing.visibility = View.GONE
+            return
+        }
+        val previousText = binding.tvAutoPing.text
+        binding.tvAutoPing.apply {
+            visibility = View.VISIBLE
+            setText(R.string.mobiletina_ping_testing)
+        }
+        pingRefreshJob = lifecycleScope.launchWhenStarted {
+            val result = withContext(Dispatchers.IO) { runCatching { urlTest() } }
+            if (state == BaseService.State.Connected) {
+                binding.tvAutoPing.text = result.fold(
+                    onSuccess = { "$it ms" },
+                    onFailure = { previousText.takeIf { it.isNotBlank() }
+                        ?: getString(R.string.mobiletina_ping_tap) },
+                )
+            } else binding.tvAutoPing.visibility = View.GONE
+            pingRefreshJob = null
+        }
     }
 
     override fun statsUpdated(stats: List<AppStats>) {
