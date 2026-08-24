@@ -34,6 +34,7 @@ import io.nekohasekai.sagernet.database.preference.OnPreferenceDataStoreChangeLi
 import io.nekohasekai.sagernet.database.preference.PublicDatabase
 import io.nekohasekai.sagernet.database.preference.RoomPreferenceDataStore
 import io.nekohasekai.sagernet.ktx.*
+import io.nekohasekai.sagernet.utils.Theme
 import java.io.BufferedReader
 import java.io.StringReader
 import java.util.Locale
@@ -130,8 +131,8 @@ object DataStore : OnPreferenceDataStoreChangeListener {
         return groups.find { it.type == GroupType.BASIC }!!.id
     }
 
-    var appTheme by configurationStore.int(Key.APP_THEME)
-    var nightTheme by configurationStore.stringToInt(Key.NIGHT_THEME)
+    var appTheme by configurationStore.int(Key.APP_THEME) { Theme.BLACK }
+    var nightTheme by configurationStore.stringToInt(Key.NIGHT_THEME) { 1 }
     var serviceMode by configurationStore.string(Key.SERVICE_MODE) { Key.MODE_VPN }
 
     var domainStrategy by configurationStore.string(Key.DOMAIN_STRATEGY) { "AsIs" }

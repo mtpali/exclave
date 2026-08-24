@@ -19,4 +19,5 @@
     <string name="mobiletina_add" translatable="false">افزودن سرور</string>
     <string name="mobiletina_days_remaining" translatable="false">%1$d روز باقی‌مانده</string>
     <string name="mobiletina_traffic_summary" translatable="false">%1$.1f GB / %2$.1f GB</string>
+    <string name="mobiletina_subscription_name" translatable="false">instagram : mobile.tina</string>
 </resources>

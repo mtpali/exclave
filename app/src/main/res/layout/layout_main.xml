@@ -60,7 +60,8 @@
         </LinearLayout>
 
         <FrameLayout android:id="@+id/mode_container" android:layout_width="match_parent"
-            android:layout_height="0dp" android:layout_weight="1">
+            android:layout_height="0dp" android:layout_weight="1"
+            android:clipChildren="false" android:clipToPadding="false">
             <androidx.coordinatorlayout.widget.CoordinatorLayout android:id="@+id/coordinator"
                 android:layout_width="match_parent" android:layout_height="match_parent" android:clipChildren="false">
                 <androidx.coordinatorlayout.widget.CoordinatorLayout android:id="@+id/fragment_holder"
@@ -156,17 +157,18 @@
             </ScrollView>
 
             <FrameLayout android:id="@+id/manual_dock" android:layout_width="match_parent"
-                android:layout_height="126dp" android:layout_gravity="bottom"
-                android:background="@color/mobiletina_manual_dock_bg" android:visibility="gone">
+                android:layout_height="142dp" android:layout_gravity="bottom"
+                android:background="@color/mobiletina_manual_dock_bg"
+                android:clipChildren="false" android:clipToPadding="false" android:visibility="gone">
                 <com.google.android.material.imageview.ShapeableImageView
-                    android:id="@+id/fab_manual" android:layout_width="92dp" android:layout_height="92dp"
-                    android:layout_gravity="top|center_horizontal" android:translationY="-34dp"
+                    android:id="@+id/fab_manual" android:layout_width="78dp" android:layout_height="78dp"
+                    android:layout_gravity="top|center_horizontal" android:translationY="-22dp"
                     android:background="@android:color/transparent" android:clickable="true"
                     android:focusable="true" android:scaleType="fitCenter"
                     android:src="@drawable/mt_manual_stop" />
                 <com.google.android.material.imageview.ShapeableImageView
-                    android:id="@+id/btn_smart_connect" android:layout_width="145dp" android:layout_height="47dp"
-                    android:layout_gravity="top|center_horizontal" android:layout_marginTop="57dp"
+                    android:id="@+id/btn_smart_connect" android:layout_width="142dp" android:layout_height="46dp"
+                    android:layout_gravity="top|center_horizontal" android:layout_marginTop="62dp"
                     android:background="@android:color/transparent" android:clickable="true"
                     android:focusable="true" android:scaleType="fitCenter"
                     android:src="@drawable/mt_manual_auto" />
@@ -183,12 +185,14 @@
     <com.google.android.material.navigation.NavigationView android:id="@+id/nav_view"
         style="@style/Widget.Design.NavigationView" android:layout_width="wrap_content"
         android:layout_height="match_parent" android:layout_gravity="start"
+        android:layoutDirection="ltr" android:textDirection="ltr" android:textAlignment="viewStart"
         app:itemIconTint="@color/navigation_icon" app:itemTextColor="@color/navigation_icon"
         app:headerLayout="@layout/mobiletina_nav_header" app:itemMaxLines="10"
         app:menu="@menu/main_drawer_menu" />
     <com.google.android.material.navigation.NavigationView android:id="@+id/nav_view_black"
         style="@style/Widget.Design.NavigationView" android:layout_width="wrap_content"
         android:layout_height="match_parent" android:layout_gravity="start"
+        android:layoutDirection="ltr" android:textDirection="ltr" android:textAlignment="viewStart"
         app:itemIconTint="@color/navigation_icon" app:itemShapeAppearance="@style/ShapeAppearance.MaterialComponents.MediumComponent"
         app:itemShapeFillColor="@color/navigation_item" app:itemTextColor="@color/navigation_icon"
         app:headerLayout="@layout/mobiletina_nav_header" app:itemMaxLines="10"

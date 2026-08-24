@@ -7,7 +7,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:paddingTop="8dp"
-    android:paddingBottom="132dp"
+    android:paddingBottom="164dp"
     android:scrollbarSize="0dp"
     app:fastScrollAutoHide="true"
     app:fastScrollThumbColor="?colorPrimary"

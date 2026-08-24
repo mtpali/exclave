@@ -5,14 +5,14 @@
     android:id="@+id/content"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginStart="12dp"
-    android:layout_marginTop="6dp"
-    android:layout_marginEnd="12dp"
-    android:layout_marginBottom="6dp"
+    android:layout_marginStart="10dp"
+    android:layout_marginTop="4dp"
+    android:layout_marginEnd="10dp"
+    android:layout_marginBottom="4dp"
     android:clickable="true"
     android:focusable="true"
-    android:minHeight="68dp"
-    app:cardCornerRadius="18dp"
+    android:minHeight="58dp"
+    app:cardCornerRadius="14dp"
     app:cardElevation="0dp"
     app:strokeColor="@color/mobiletina_mode_stroke"
     app:strokeWidth="1dp">
@@ -52,9 +52,9 @@
                     android:layout_gravity="center_vertical"
                     android:layout_weight="1"
                     android:gravity="center_vertical"
-                    android:paddingStart="18dp"
-                    android:paddingTop="20dp"
-                    android:paddingBottom="20dp">
+                    android:paddingStart="14dp"
+                    android:paddingTop="13dp"
+                    android:paddingBottom="13dp">
 
                     <TextView
                         android:id="@+id/profile_name"
@@ -156,7 +156,7 @@
                 android:orientation="horizontal"
                 android:paddingStart="12dp"
                 android:paddingEnd="8dp"
-                android:paddingBottom="12dp">
+                android:paddingBottom="8dp">
 
                 <TextView
                     android:id="@+id/profile_type"

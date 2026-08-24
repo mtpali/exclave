@@ -59,42 +59,7 @@ class GroupInterfaceAdapter(val context: ThemedActivity) : GroupManager.Interfac
         deleted: List<String>,
         duplicate: List<String>,
     ) {
-        if (changed == 0 && duplicate.isEmpty()) {
-            onMainDispatcher {
-                context.snackbar(context.getString(R.string.group_no_difference, group.displayName())).show()
-            }
-        } else {
-            var status = context.resources.getQuantityString(R.plurals.group_updated, changed, group.name, changed) + "\n\n"
-            if (added.isNotEmpty()) {
-                status += context.getString(
-                        R.string.group_added, added.joinToString("\n", postfix = "\n\n")
-                )
-            }
-            if (updated.isNotEmpty()) {
-                status += context.getString(R.string.group_changed,
-                        updated.map { it }.joinToString("\n", postfix = "\n\n") {
-                            if (it.key == it.value) it.key else "${it.key} => ${it.value}"
-                        })
-            }
-            if (deleted.isNotEmpty()) {
-                status += context.getString(
-                        R.string.group_deleted, deleted.joinToString("\n", postfix = "\n\n")
-                )
-            }
-            if (duplicate.isNotEmpty()) {
-                status += context.getString(
-                        R.string.group_duplicate, duplicate.joinToString("\n", postfix = "\n\n")
-                )
-            }
-
-            onMainDispatcher {
-                MaterialAlertDialogBuilder(context).setTitle(
-                        context.getString(
-                                R.string.group_diff, group.displayName()
-                        )
-                ).setMessage(status.trim()).setPositiveButton(android.R.string.ok, null).show()
-            }
-        }
+        // MobileTina updates subscriptions silently. The list is refreshed by GroupManager.
     }
 
     override suspend fun onUpdateFailure(group: ProxyGroup, message: String) {

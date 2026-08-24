@@ -35,6 +35,7 @@ import android.view.KeyEvent
 import android.view.MenuItem
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewGroup
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
@@ -138,17 +139,19 @@ class MainActivity : ThemedActivity(),
             binding.drawerLayout.removeView(binding.navView)
         }
         navigation.setNavigationItemSelectedListener(this)
+        navigation.layoutDirection = View.LAYOUT_DIRECTION_LTR
+        navigation.textDirection = View.TEXT_DIRECTION_LTR
+        navigation.textAlignment = View.TEXT_ALIGNMENT_VIEW_START
+        navigation.post { forceLtrTree(navigation) }
         binding.mobiletinaMenu.setOnClickListener { binding.drawerLayout.open() }
         binding.mobiletinaScan.setOnClickListener {
             startActivity(Intent(this, ScannerActivity::class.java))
         }
         binding.mobiletinaAdd.setOnClickListener {
-            setHomeMode(HomeMode.MANUAL)
             (supportFragmentManager.findFragmentById(R.id.fragment_holder) as? ConfigurationFragment)
                 ?.openMobileTinaAddMenu(binding.mobiletinaAdd)
         }
         binding.mobiletinaMore.setOnClickListener {
-            setHomeMode(HomeMode.MANUAL)
             (supportFragmentManager.findFragmentById(R.id.fragment_holder) as? ConfigurationFragment)
                 ?.openMobileTinaMoreMenu(binding.mobiletinaMore)
         }
@@ -491,31 +494,36 @@ class MainActivity : ThemedActivity(),
         val group = ProxyGroup(type = GroupType.SUBSCRIPTION).apply {
             subscription = SubscriptionBean().apply {
                 link = uri
-                name = getString(R.string.subscription)
+                name = getString(R.string.mobiletina_subscription_name)
             }
         }
 
-        onMainDispatcher {
-
-            displayFragmentWithId(R.id.nav_group)
-
-            MaterialAlertDialogBuilder(this@MainActivity).setTitle(R.string.subscription_import)
-                .setMessage(getString(R.string.subscription_import_message, uri))
-                .setPositiveButton(android.R.string.ok) { _, _ ->
-                    runOnDefaultDispatcher {
-                        finishImportSubscription(group)
-                    }
-                }
-                .setNegativeButton(android.R.string.cancel, null)
-                .show()
-
-        }
+        finishImportSubscription(group)
 
     }
 
     private suspend fun finishImportSubscription(subscription: ProxyGroup) {
-        GroupManager.createGroup(subscription)
-        // GroupUpdater.startUpdate(subscription, true)
+        val created = GroupManager.createGroup(subscription)
+        val subscriptionName = getString(R.string.mobiletina_subscription_name)
+        created.name = subscriptionName
+        created.subscription?.name = subscriptionName
+        GroupManager.updateGroup(created)
+        DataStore.selectedGroup = created.id
+        GroupUpdater.executeUpdate(created, byUser = false)
+        onMainDispatcher {
+            displayFragmentWithId(R.id.nav_configuration)
+            setHomeMode(HomeMode.AUTO)
+            refreshSubscriptionCard()
+        }
+    }
+
+    private fun forceLtrTree(view: View) {
+        view.layoutDirection = View.LAYOUT_DIRECTION_LTR
+        view.textDirection = View.TEXT_DIRECTION_LTR
+        view.textAlignment = View.TEXT_ALIGNMENT_VIEW_START
+        if (view is ViewGroup) {
+            for (index in 0 until view.childCount) forceLtrTree(view.getChildAt(index))
+        }
     }
 
     suspend fun importProfile(uri: Uri) {

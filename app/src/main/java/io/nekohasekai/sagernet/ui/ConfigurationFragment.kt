@@ -107,7 +107,7 @@ class ConfigurationFragment @JvmOverloads constructor(
         view?.findViewById<View>(R.id.appbar)?.isGone = enabled
         if (::groupPager.isInitialized) {
             groupPager.clipToPadding = false
-            groupPager.setPadding(0, 0, 0, if (enabled) dp2px(112) else 0)
+            groupPager.setPadding(0, 0, 0, 0)
         }
     }
 
@@ -702,7 +702,7 @@ class ConfigurationFragment @JvmOverloads constructor(
                     val currentGroup = DataStore.currentGroup()
                     if (currentGroup.type == GroupType.SUBSCRIPTION) {
                         if (currentGroup.id !in GroupUpdater.updating) {
-                            GroupUpdater.startUpdate(currentGroup, true)
+                            GroupUpdater.startUpdate(currentGroup, false)
                         }
                     } else {
                         snackbar(R.string.group_not_a_subscription).show()
@@ -966,8 +966,9 @@ class ConfigurationFragment @JvmOverloads constructor(
                     SagerDatabase.groupDao.createGroup(ProxyGroup(ungrouped = true))
                     newGroupList = ArrayList(SagerDatabase.groupDao.allGroups())
                 }
+                val hasSubscription = newGroupList.any { it.type == GroupType.SUBSCRIPTION }
                 newGroupList.find { it.ungrouped }?.let {
-                    if (SagerDatabase.proxyDao.countByGroup(it.id) == 0L) {
+                    if (hasSubscription || SagerDatabase.proxyDao.countByGroup(it.id) == 0L) {
                         newGroupList.remove(it)
                     }
                 }
@@ -976,12 +977,15 @@ class ConfigurationFragment @JvmOverloads constructor(
                 var set = false
                 if (selectedGroup > 0L) {
                     selectedGroupIndex = newGroupList.indexOfFirst { it.id == selectedGroup }
-                    set = true
-                } else if (groupList.size == 1) {
-                    selectedGroup = groupList[0].id
+                    set = selectedGroupIndex >= 0
+                }
+                if (!set && newGroupList.isNotEmpty()) {
+                    selectedGroupIndex = 0
+                    selectedGroup = newGroupList[0].id
                     if (DataStore.selectedGroup != selectedGroup) {
                         DataStore.selectedGroup = selectedGroup
                     }
+                    set = true
                 }
 
                 try {
@@ -1032,6 +1036,10 @@ class ConfigurationFragment @JvmOverloads constructor(
         }
 
         override suspend fun groupAdd(group: ProxyGroup) {
+            if (group.type == GroupType.SUBSCRIPTION) {
+                reload()
+                return
+            }
             tabLayout.post {
                 groupList.add(group)
 
@@ -1045,12 +1053,7 @@ class ConfigurationFragment @JvmOverloads constructor(
         }
 
         override suspend fun groupRemoved(groupId: Long) {
-            tabLayout.post {
-                val index = groupList.indexOfFirst { it.id == groupId }
-                if (index == -1) return@post
-                groupList.removeAt(index)
-                notifyItemRemoved(index)
-            }
+            reload()
         }
 
         override suspend fun groupUpdated(group: ProxyGroup) {
