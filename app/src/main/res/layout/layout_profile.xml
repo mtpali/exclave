@@ -5,14 +5,14 @@
     android:id="@+id/content"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginStart="8dp"
-    android:layout_marginTop="3dp"
-    android:layout_marginEnd="8dp"
-    android:layout_marginBottom="3dp"
+    android:layout_marginStart="10dp"
+    android:layout_marginTop="2dp"
+    android:layout_marginEnd="10dp"
+    android:layout_marginBottom="2dp"
     android:clickable="true"
     android:focusable="true"
-    android:minHeight="52dp"
-    app:cardCornerRadius="12dp"
+    android:minHeight="46dp"
+    app:cardCornerRadius="11dp"
     app:cardElevation="0dp"
     app:strokeColor="@color/mobiletina_mode_stroke"
     app:strokeWidth="1dp">
@@ -26,7 +26,7 @@
 
         <LinearLayout
             android:id="@+id/selected_view"
-            android:layout_width="4dp"
+            android:layout_width="3dp"
             android:layout_height="match_parent"
             android:background="?selectedColorPrimary"
             android:orientation="horizontal"
@@ -53,15 +53,15 @@
                     android:layout_weight="1"
                     android:gravity="center_vertical"
                     android:paddingStart="12dp"
-                    android:paddingTop="10dp"
-                    android:paddingBottom="10dp">
+                    android:paddingTop="7dp"
+                    android:paddingBottom="4dp">
 
                     <TextView
                         android:id="@+id/profile_name"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:textAppearance="?android:attr/textAppearanceMedium"
                         android:textColor="?android:attr/textColorPrimary"
+                        android:textSize="17sp"
                         android:textStyle="bold"
                         tools:text="@string/profile_name" />
                 </LinearLayout>
@@ -156,16 +156,16 @@
                 android:orientation="horizontal"
                 android:paddingStart="12dp"
                 android:paddingEnd="8dp"
-                android:paddingBottom="8dp">
+                android:paddingBottom="5dp">
 
                 <TextView
                     android:id="@+id/profile_type"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:textAppearance="?android:attr/textAppearanceSmall"
                     android:textColor="?colorAccent"
                     android:textDirection="locale"
+                    android:textSize="13sp"
                     android:visibility="gone"
                     tools:text="Protocol" />
 
