@@ -2,7 +2,7 @@ name: Debug Build
 on:
   push:
     branches:
-      - dev*\n      - dev-mobiletina-ui-v5
+      - "dev*"
     paths:
       - "app/**"
       - "buildSrc/**"
