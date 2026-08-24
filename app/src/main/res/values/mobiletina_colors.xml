@@ -10,4 +10,5 @@
     <color name="mobiletina_status_secondary">#343740</color>
     <color name="mobiletina_manual_dock_bg">#FFFFFF</color>
     <color name="mobiletina_manual_dock_text">#343740</color>
+    <color name="mobiletina_about_accent">#E91E63</color>
 </resources>
