@@ -4,4 +4,85 @@
         <item name="cornerFamily">rounded</item>
         <item name="cornerSize">50%</item>
     </style>
+
+    <style name="MobileTinaAboutCard" parent="Widget.MaterialComponents.CardView">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">76dp</item>
+        <item name="android:layout_marginBottom">10dp</item>
+        <item name="android:clickable">true</item>
+        <item name="android:focusable">true</item>
+        <item name="android:foreground">?attr/selectableItemBackground</item>
+        <item name="cardBackgroundColor">@color/mobiletina_about_card</item>
+        <item name="cardCornerRadius">18dp</item>
+        <item name="cardElevation">0dp</item>
+        <item name="strokeColor">@color/mobiletina_about_stroke</item>
+        <item name="strokeWidth">1dp</item>
+    </style>
+
+    <style name="MobileTinaAboutRow">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">match_parent</item>
+        <item name="android:gravity">center_vertical</item>
+        <item name="android:orientation">horizontal</item>
+    </style>
+
+    <style name="MobileTinaAboutInstagramStripe">
+        <item name="android:layout_width">5dp</item>
+        <item name="android:layout_height">match_parent</item>
+        <item name="android:background">@color/mobiletina_about_accent</item>
+    </style>
+
+    <style name="MobileTinaAboutTextBox">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_marginHorizontal">17dp</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:gravity">end</item>
+        <item name="android:orientation">vertical</item>
+    </style>
+
+    <style name="MobileTinaAboutLabel">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:textColor">@color/mobiletina_about_text</item>
+        <item name="android:textDirection">rtl</item>
+        <item name="android:textSize">16sp</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+
+    <style name="MobileTinaAboutHandle">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_marginTop">3dp</item>
+        <item name="android:textColor">@color/mobiletina_about_accent</item>
+        <item name="android:textDirection">ltr</item>
+        <item name="android:textSize">14sp</item>
+    </style>
+
+    <style name="MobileTinaAboutAddressCard" parent="Widget.MaterialComponents.CardView">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_marginBottom">10dp</item>
+        <item name="cardBackgroundColor">@color/mobiletina_about_card</item>
+        <item name="cardCornerRadius">18dp</item>
+        <item name="cardElevation">0dp</item>
+        <item name="strokeColor">@color/mobiletina_about_stroke</item>
+        <item name="strokeWidth">1dp</item>
+    </style>
+
+    <style name="MobileTinaAboutAddressCardLast" parent="MobileTinaAboutAddressCard">
+        <item name="android:layout_marginBottom">0dp</item>
+    </style>
+
+    <style name="MobileTinaAboutAddress">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:gravity">end|center_vertical</item>
+        <item name="android:minHeight">74dp</item>
+        <item name="android:padding">17dp</item>
+        <item name="android:textColor">@color/mobiletina_about_text</item>
+        <item name="android:textDirection">rtl</item>
+        <item name="android:textSize">15sp</item>
+        <item name="android:textStyle">bold</item>
+    </style>
 </resources>
