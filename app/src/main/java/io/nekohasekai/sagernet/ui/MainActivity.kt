@@ -492,10 +492,12 @@ class MainActivity : ThemedActivity(),
     }
 
     suspend fun importSubscription(uri: String) {
-        val group = ProxyGroup(type = GroupType.SUBSCRIPTION).apply {
+        val group = ProxyGroup(
+            name = getString(R.string.mobiletina_subscription_name),
+            type = GroupType.SUBSCRIPTION,
+        ).apply {
             subscription = SubscriptionBean().apply {
                 link = uri
-                name = getString(R.string.mobiletina_subscription_name)
             }
         }
 
@@ -505,9 +507,6 @@ class MainActivity : ThemedActivity(),
 
     private suspend fun finishImportSubscription(subscription: ProxyGroup) {
         val created = GroupManager.createGroup(subscription)
-        val subscriptionName = getString(R.string.mobiletina_subscription_name)
-        created.subscription?.name = subscriptionName
-        GroupManager.updateGroup(created)
         DataStore.selectedGroup = created.id
         GroupUpdater.executeUpdate(created, byUser = false)
         onMainDispatcher {
