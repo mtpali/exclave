@@ -9,4 +9,10 @@
     <color name="mobiletina_status_secondary">#A9ADB7</color>
     <color name="mobiletina_manual_dock_bg">#111214</color>
     <color name="mobiletina_manual_dock_text">#D7D9DE</color>
+    <color name="mobiletina_about_accent">#FF4081</color>
+    <color name="mobiletina_about_telegram">#2AABEE</color>
+    <color name="mobiletina_about_card">#17181C</color>
+    <color name="mobiletina_about_stroke">#343741</color>
+    <color name="mobiletina_about_text">#F3F4F7</color>
+    <color name="mobiletina_about_secondary">#A9ADB7</color>
 </resources>
