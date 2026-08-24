@@ -7,14 +7,14 @@
 
     <LinearLayout android:layout_width="match_parent" android:layout_height="match_parent"
         android:fitsSystemWindows="true" android:orientation="vertical">
-        <FrameLayout android:layout_width="match_parent" android:layout_height="70dp"
+        <FrameLayout android:id="@+id/mobiletina_home_header" android:layout_width="match_parent" android:layout_height="70dp"
             android:paddingStart="12dp" android:paddingEnd="12dp">
             <ImageButton android:id="@+id/mobiletina_menu" android:layout_width="56dp"
                 android:layout_height="56dp" android:layout_gravity="start|center_vertical"
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:contentDescription="@string/mobiletina_open_menu" android:padding="12dp"
                 android:scaleType="center" android:src="@drawable/ic_navigation_menu" />
-            <LinearLayout android:layout_width="0dp" android:layout_height="56dp"
+            <LinearLayout android:layout_width="match_parent" android:layout_height="56dp"
                 android:layout_gravity="center_vertical" android:layout_marginStart="60dp"
                 android:layout_marginEnd="4dp" android:background="@drawable/mobiletina_mode_surface"
                 android:gravity="center" android:orientation="horizontal" android:padding="4dp">
@@ -107,17 +107,17 @@
             </ScrollView>
 
             <FrameLayout android:id="@+id/manual_dock" android:layout_width="match_parent"
-                android:layout_height="154dp" android:layout_gravity="bottom"
+                android:layout_height="126dp" android:layout_gravity="bottom"
                 android:background="@color/mobiletina_manual_dock_bg" android:visibility="gone">
                 <com.google.android.material.imageview.ShapeableImageView
                     android:id="@+id/fab_manual" android:layout_width="92dp" android:layout_height="92dp"
-                    android:layout_gravity="top|center_horizontal" android:translationY="-28dp"
+                    android:layout_gravity="top|center_horizontal" android:translationY="-34dp"
                     android:background="@android:color/transparent" android:clickable="true"
                     android:focusable="true" android:scaleType="fitCenter"
                     android:src="@drawable/mt_manual_stop" />
                 <com.google.android.material.imageview.ShapeableImageView
                     android:id="@+id/btn_smart_connect" android:layout_width="145dp" android:layout_height="47dp"
-                    android:layout_gravity="top|center_horizontal" android:layout_marginTop="72dp"
+                    android:layout_gravity="top|center_horizontal" android:layout_marginTop="57dp"
                     android:background="@android:color/transparent" android:clickable="true"
                     android:focusable="true" android:scaleType="fitCenter"
                     android:src="@drawable/mt_manual_auto" />

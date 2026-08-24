@@ -103,7 +103,7 @@ class ConfigurationFragment @JvmOverloads constructor(
         view?.findViewById<View>(R.id.appbar)?.isGone = enabled
         if (::groupPager.isInitialized) {
             groupPager.clipToPadding = false
-            groupPager.setPadding(0, 0, 0, if (enabled) dp2px(126) else 0)
+            groupPager.setPadding(0, 0, 0, if (enabled) dp2px(112) else 0)
         }
     }
 
@@ -1651,7 +1651,7 @@ class ConfigurationFragment @JvmOverloads constructor(
                 }
 
                 if (proxyEntity.status == 3) {
-                    profileStatus.setText(R.string.unavailable)
+                    profileStatus.text = "—"
                     profileStatus.setOnClickListener {
                         alert(proxyEntity.error ?: "<?>").show()
                     }

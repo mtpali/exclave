@@ -98,6 +98,7 @@ class MainActivity : ThemedActivity(),
     private var smartConnectJob: Job? = null
     private var smartConnectGeneration = 0L
     private var swipeDownX = 0f
+    private var showingHome = true
 
     override val onBackPressedCallback = object : OnBackPressedCallback(enabled = false) {
         override fun handleOnBackPressed() {
@@ -328,9 +329,10 @@ class MainActivity : ThemedActivity(),
     private fun setHomeMode(mode: HomeMode) {
         homeMode = mode
         val auto = mode == HomeMode.AUTO
-        binding.autoPanel.visibility = if (auto) View.VISIBLE else View.GONE
-        binding.coordinator.visibility = if (auto) View.GONE else View.VISIBLE
-        binding.manualDock.visibility = if (auto) View.GONE else View.VISIBLE
+        binding.mobiletinaHomeHeader.visibility = if (showingHome) View.VISIBLE else View.GONE
+        binding.autoPanel.visibility = if (showingHome && auto) View.VISIBLE else View.GONE
+        binding.coordinator.visibility = if (showingHome && auto) View.GONE else View.VISIBLE
+        binding.manualDock.visibility = if (showingHome && !auto) View.VISIBLE else View.GONE
         binding.fab.visibility = View.GONE
         binding.fabProgress.visibility = View.GONE
         binding.stats.visibility = View.GONE
@@ -489,6 +491,11 @@ class MainActivity : ThemedActivity(),
     }
 
     override fun onNavigationItemSelected(item: MenuItem): Boolean {
+        if (item.itemId == R.id.nav_per_app) {
+            startActivity(Intent(this, AppManagerActivity::class.java))
+            binding.drawerLayout.closeDrawers()
+            return true
+        }
         if (item.isChecked) binding.drawerLayout.closeDrawers() else {
             return displayFragmentWithId(item.itemId)
         }
@@ -496,20 +503,26 @@ class MainActivity : ThemedActivity(),
     }
 
 
-    fun displayFragment(fragment: ToolbarFragment) {
-        if (::binding.isInitialized) setHomeMode(HomeMode.MANUAL)
+    fun displayFragment(fragment: ToolbarFragment, home: Boolean = false) {
+        showingHome = home
+        if (::binding.isInitialized) {
+            binding.mobiletinaHomeHeader.visibility = if (home) View.VISIBLE else View.GONE
+            binding.autoPanel.visibility = if (home && homeMode == HomeMode.AUTO) View.VISIBLE else View.GONE
+            binding.coordinator.visibility = if (home && homeMode == HomeMode.AUTO) View.GONE else View.VISIBLE
+            binding.manualDock.visibility = if (home && homeMode == HomeMode.MANUAL) View.VISIBLE else View.GONE
+        }
         supportFragmentManager.beginTransaction()
             .replace(R.id.fragment_holder, fragment)
             .commitAllowingStateLoss()
         supportFragmentManager.executePendingTransactions()
-        (fragment as? ConfigurationFragment)?.setMobileTinaPresentation(homeMode == HomeMode.MANUAL)
+        (fragment as? ConfigurationFragment)?.setMobileTinaPresentation(home)
         binding.drawerLayout.closeDrawers()
     }
 
     fun displayFragmentWithId(@IdRes id: Int): Boolean {
         when (id) {
             R.id.nav_configuration -> {
-                displayFragment(ConfigurationFragment())
+                displayFragment(ConfigurationFragment(), home = true)
                 connection.bandwidthTimeout = connection.bandwidthTimeout
             }
             R.id.nav_group -> displayFragment(GroupFragment())
@@ -524,12 +537,12 @@ class MainActivity : ThemedActivity(),
             R.id.nav_about -> displayFragment(AboutFragment())
             else -> return false
         }
-        navigation.menu.findItem(id).isChecked = true
+        navigation.menu.findItem(id)?.isChecked = true
         return true
     }
 
     fun ruleCreated() {
-        navigation.menu.findItem(R.id.nav_route).isChecked = true
+        navigation.menu.findItem(R.id.nav_route)?.isChecked = true
         supportFragmentManager.beginTransaction()
             .replace(R.id.fragment_holder, RouteFragment())
             .commitAllowingStateLoss()

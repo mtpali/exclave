@@ -10,4 +10,8 @@
     <string name="mobiletina_status_failed" translatable="false">اتصال ناموفق بود</string>
     <string name="mobiletina_connect_action" translatable="false">اتصال</string>
     <string name="mobiletina_open_menu" translatable="false">باز کردن منو</string>
+    <string name="mobiletina_menu_home" translatable="false">صفحه اصلی</string>
+    <string name="mobiletina_menu_subscriptions" translatable="false">اشتراک‌ها</string>
+    <string name="mobiletina_menu_per_app" translatable="false">فیلتر برنامه‌ها</string>
+    <string name="mobiletina_menu_about" translatable="false">درباره فروشگاه</string>
 </resources>
