@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<resources>\n    <!-- Keeps device-test builds traceable in GitHub Actions. -->
     <string name="mobiletina_testing">در حال بررسی سرورها…</string>
     <string name="mobiletina_no_working_server">سرور فعالی پیدا نشد</string>
     <string name="mobiletina_mode_auto" translatable="false">حالت خودکار</string>
