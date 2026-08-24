@@ -1717,7 +1717,7 @@ class ConfigurationFragment @JvmOverloads constructor(
                                 ProfileManager.updateProfile(proxyEntity)
                                 onMainDispatcher {
                                     bindingAdapterPosition.takeIf { it != RecyclerView.NO_POSITION }
-                                        ?.let(::notifyItemChanged)
+                                        ?.let(this@ConfigurationAdapter::notifyItemChanged)
                                 }
                             }
                         }
