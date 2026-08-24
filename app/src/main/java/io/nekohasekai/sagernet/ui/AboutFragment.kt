@@ -15,7 +15,7 @@ class AboutFragment : ToolbarFragment(R.layout.layout_about) {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        toolbar.setTitle(R.string.mobiletina_menu_about)
+        view.findViewById<View>(R.id.appbar).visibility = View.GONE
 
         ViewCompat.setOnApplyWindowInsetsListener(view.findViewById(R.id.layout_about)) { content, insets ->
             val bars = insets.getInsets(
@@ -32,6 +32,9 @@ class AboutFragment : ToolbarFragment(R.layout.layout_about) {
         bindInstagram(view, R.id.about_instagram_one, "mobile.tina")
         bindInstagram(view, R.id.about_instagram_two, "mobile.tina2")
         bindInstagram(view, R.id.about_instagram_three, "mobile.tinaa")
+        view.findViewById<View>(R.id.about_developer).setOnClickListener {
+            startActivity(Intent(Intent.ACTION_VIEW, "https://t.me/vpn963".toUri()))
+        }
 
         (requireActivity() as? MainActivity)?.onBackPressedCallback?.isEnabled = true
     }
