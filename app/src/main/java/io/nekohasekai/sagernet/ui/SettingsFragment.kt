@@ -28,7 +28,7 @@ class SettingsFragment : ToolbarFragment(R.layout.layout_config_settings) {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        toolbar.setTitle(R.string.settings)
+        toolbar.setTitle(R.string.mobiletina_menu_settings)
 
         parentFragmentManager.beginTransaction()
             .replace(R.id.settings, SettingsPreferenceFragment())
