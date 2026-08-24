@@ -123,7 +123,10 @@
                     android:textSize="15sp" android:textStyle="bold" />
                 <TextView android:id="@+id/tv_auto_ping" android:layout_width="wrap_content"
                     android:layout_height="wrap_content" android:layout_marginTop="6dp"
-                    android:gravity="center" android:paddingHorizontal="18dp" android:paddingVertical="5dp"
+                    android:background="?attr/selectableItemBackgroundBorderless" android:clickable="true"
+                    android:contentDescription="@string/mobiletina_ping_tap" android:focusable="true"
+                    android:gravity="center" android:minHeight="40dp"
+                    android:paddingHorizontal="18dp" android:paddingVertical="5dp"
                     android:textColor="@color/mobiletina_status_secondary" android:textStyle="bold"
                     android:visibility="gone" />
                 <com.google.android.material.card.MaterialCardView
