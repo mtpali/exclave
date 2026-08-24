@@ -51,6 +51,7 @@ class GroupInterfaceAdapter(val context: ThemedActivity) : GroupManager.Interfac
         }
     }
 
+    @Suppress("UNUSED_PARAMETER")
     override suspend fun onUpdateSuccess(
         group: ProxyGroup,
         changed: Int,
