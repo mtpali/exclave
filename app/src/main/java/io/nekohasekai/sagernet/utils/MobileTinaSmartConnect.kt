@@ -11,7 +11,6 @@
 
 package io.nekohasekai.sagernet.utils
 
-import android.os.SystemClock
 import io.nekohasekai.sagernet.R
 import io.nekohasekai.sagernet.bg.test.V2RayTestInstance
 import io.nekohasekai.sagernet.database.DataStore
@@ -24,6 +23,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.supervisorScope
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * Low-latency, bounded server selection for the MobileTina automatic screen.
@@ -32,24 +32,18 @@ import kotlinx.coroutines.supervisorScope
  * connecting makes the common case unnecessarily slow, while blindly reusing a stale result
  * makes the connection unreliable. This selector therefore:
  *
- * 1. reuses a successful result only for a short monotonic-time window;
- * 2. ranks the selected and previously healthy profiles ahead of unknown/failed profiles;
- * 3. probes a small fast batch, followed by bounded fallback batches;
- * 4. retries only the two profiles that were healthy before this run.
+ * 1. always re-tests the previously selected profile instead of trusting a stale ping;
+ * 2. makes it compete with healthy and evenly distributed alternative profiles;
+ * 3. rotates the distributed probes between attempts so a large subscription is explored over time;
+ * 4. probes bounded fallback batches and retries only profiles that were healthy before this run.
  *
- * Every selected profile is either the only available profile, a very recent verified profile,
- * or has succeeded in the current probe run.
+ * Except for a subscription containing only one profile, every selected profile has succeeded in
+ * the current probe run. Consequently a slow or unreachable previous winner cannot be reused just
+ * because it won an earlier attempt.
  */
 object MobileTinaSmartConnect {
 
-    private data class RecentSuccess(
-        val profileId: Long,
-        val fingerprint: Int,
-        val verifiedAtElapsed: Long,
-    )
-
-    @Volatile
-    private var recentSuccess: RecentSuccess? = null
+    private val probeRound = AtomicInteger()
 
     suspend fun selectBest(
         profiles: List<ProxyEntity>,
@@ -58,16 +52,6 @@ object MobileTinaSmartConnect {
     ): ProxyEntity? {
         if (profiles.isEmpty() || !isCurrent()) return null
         if (profiles.size == 1) return profiles.first()
-
-        val now = SystemClock.elapsedRealtime()
-        recentSuccess?.takeIf {
-            now - it.verifiedAtElapsed in 0..RECENT_SUCCESS_TTL_MS
-        }?.let { cached ->
-            profiles.firstOrNull {
-                it.id == cached.profileId && it.status == 1 && it.ping > 0 &&
-                        fingerprint(it) == cached.fingerprint
-            }?.let { return it }
-        }
 
         val previouslyHealthyIds = profiles.asSequence()
             .filter { it.status == 1 && it.ping > 0 }
@@ -83,7 +67,7 @@ object MobileTinaSmartConnect {
                 { it.userOrder },
             )
         )
-        val candidates = buildCandidateList(ranked)
+        val candidates = buildCandidateList(ranked, selectedProxy, nextProbeRound())
 
         var offset = 0
         var batchNumber = 0
@@ -93,7 +77,6 @@ object MobileTinaSmartConnect {
             val timeout = if (batchNumber == 0) FAST_TIMEOUT_MS else FALLBACK_TIMEOUT_MS
             val winner = testBatch(batch, timeout, isCurrent).minByOrNull { it.ping }
             if (winner != null && isCurrent()) {
-                remember(winner)
                 return winner
             }
             offset = end
@@ -106,25 +89,69 @@ object MobileTinaSmartConnect {
         // previously healthy profiles is more useful and much faster than repeating all tests.
         val retry = previouslyHealthyIds.mapNotNull { id -> profiles.firstOrNull { it.id == id } }
         val winner = testBatch(retry, FINAL_RETRY_TIMEOUT_MS, isCurrent).minByOrNull { it.ping }
-        if (winner != null && isCurrent()) remember(winner)
         return winner
     }
 
-    private fun buildCandidateList(ranked: List<ProxyEntity>): List<ProxyEntity> {
-        if (ranked.size <= MAX_PROFILES_PER_RUN) return ranked
+    private fun buildCandidateList(
+        ranked: List<ProxyEntity>,
+        selectedProxy: Long,
+        round: Int,
+    ): List<ProxyEntity> {
+        if (ranked.size <= BATCH_SIZE) return ranked
 
-        val preferred = ranked.take(BATCH_SIZE)
-        val remaining = ranked.drop(BATCH_SIZE)
-        val sampleSize = MAX_PROFILES_PER_RUN - preferred.size
-        if (sampleSize <= 1) return preferred + remaining.first()
+        val competition = LinkedHashMap<Long, ProxyEntity>(BATCH_SIZE)
 
-        // Spread fallback probes over the entire subscription instead of testing only its
-        // first rows. Providers commonly group servers by country or transport.
-        val sampled = (0 until sampleSize).map { index ->
-            val position = index * (remaining.lastIndex.toLong()) / (sampleSize - 1L)
-            remaining[position.toInt()]
+        // The previous winner must be measured again, but never gets an automatic win.
+        ranked.firstOrNull { it.id == selectedProxy }?.let { competition[it.id] = it }
+
+        // Preserve the low-latency fast path by including a few historically healthy servers.
+        ranked.asSequence()
+            .filter { it.status == 1 && it.ping > 0 }
+            .take(PREFERRED_HEALTHY_PROFILES)
+            .forEach { competition[it.id] = it }
+
+        // Fill the first batch from across the subscription. Rotating the starting position makes
+        // different regions/transports compete on later clicks instead of permanently favoring the
+        // first rows of a provider's list.
+        val competitionPool = ranked.filterNot { competition.containsKey(it.id) }
+        spreadSample(
+            competitionPool,
+            BATCH_SIZE - competition.size,
+            round,
+        ).forEach { competition[it.id] = it }
+
+        val candidates = LinkedHashMap<Long, ProxyEntity>(MAX_PROFILES_PER_RUN)
+        competition.values.forEach { candidates[it.id] = it }
+
+        val fallbackPool = ranked.filterNot { candidates.containsKey(it.id) }
+        spreadSample(
+            fallbackPool,
+            MAX_PROFILES_PER_RUN - candidates.size,
+            round + BATCH_SIZE,
+        ).forEach { candidates[it.id] = it }
+        return candidates.values.toList()
+    }
+
+    private fun spreadSample(
+        profiles: List<ProxyEntity>,
+        requested: Int,
+        round: Int,
+    ): List<ProxyEntity> {
+        if (requested <= 0 || profiles.isEmpty()) return emptyList()
+        if (requested >= profiles.size) return profiles
+
+        val count = minOf(requested, profiles.size)
+        val start = Math.floorMod(round, profiles.size)
+        return (0 until count).map { index ->
+            val spreadOffset = index * profiles.size.toLong() / count
+            profiles[((start + spreadOffset) % profiles.size).toInt()]
         }
-        return preferred + sampled
+    }
+
+    private fun nextProbeRound(): Int {
+        return probeRound.getAndUpdate { current ->
+            if (current == Int.MAX_VALUE) 0 else current + 1
+        }
     }
 
     private suspend fun testBatch(
@@ -184,23 +211,11 @@ object MobileTinaSmartConnect {
         else -> 4
     }
 
-    private fun remember(profile: ProxyEntity) {
-        recentSuccess = RecentSuccess(
-            profileId = profile.id,
-            fingerprint = fingerprint(profile),
-            verifiedAtElapsed = SystemClock.elapsedRealtime(),
-        )
-    }
-
-    private fun fingerprint(profile: ProxyEntity): Int {
-        return 31 * profile.type + profile.requireBean().hashCode()
-    }
-
     private const val BATCH_SIZE = 8
     private const val MAX_PROFILES_PER_RUN = 24
+    private const val PREFERRED_HEALTHY_PROFILES = 3
     private const val RETRY_CANDIDATES = 2
     private const val FAST_TIMEOUT_MS = 2_200
     private const val FALLBACK_TIMEOUT_MS = 3_200
     private const val FINAL_RETRY_TIMEOUT_MS = 4_500
-    private const val RECENT_SUCCESS_TTL_MS = 90_000L
 }
