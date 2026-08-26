@@ -73,6 +73,7 @@ import io.nekohasekai.sagernet.database.SagerDatabase
 import io.nekohasekai.sagernet.fmt.internal.BalancerBean
 import io.nekohasekai.sagernet.fmt.internal.ChainBean
 import io.nekohasekai.sagernet.utils.FormatFileSizeCompat
+import io.nekohasekai.sagernet.utils.MobileTinaImportNormalizer
 
 @android.annotation.SuppressLint("ClickableViewAccessibility")
 fun View.suppressDragWhilePressed(setPressed: (Boolean) -> Unit) {
@@ -322,13 +323,16 @@ class ConfigurationFragment @JvmOverloads constructor(
                     }
 
                 val proxies = mutableListOf<AbstractBean>()
+                var subscriptionUrl: String? = null
                 if (fileName != null && fileName.endsWith(".zip")) {
                     // try parse wireguard zip
                     val zip = ZipInputStream(requireContext().contentResolver.openInputStream(file)!!)
                     while (true) {
                         val entry = zip.nextEntry ?: break
                         if (entry.isDirectory) continue
-                        fileText = zip.bufferedReader().readText()
+                        fileText = MobileTinaImportNormalizer.normalize(
+                            zip.bufferedReader().readText()
+                        ).orEmpty()
                         RawUpdater.parseRaw(fileText)?.let { pl -> proxies.addAll(pl) }
                         zip.closeEntry()
                     }
@@ -339,16 +343,18 @@ class ConfigurationFragment @JvmOverloads constructor(
                     fileText = requireContext().contentResolver.openInputStream(file)!!.use {
                         it.bufferedReader().readText()
                     }
-                    RawUpdater.parseRaw(fileText)?.let { pl -> proxies.addAll(pl) }
+                    fileText = MobileTinaImportNormalizer.normalize(fileText).orEmpty()
+                    subscriptionUrl = MobileTinaImportNormalizer.subscriptionUrl(fileText)
+                    if (subscriptionUrl == null) {
+                        RawUpdater.parseRaw(fileText)?.let { pl -> proxies.addAll(pl) }
+                    }
                 }
 
-                if (proxies.isEmpty()) {
-                    if (!fileText.contains("\n") && !fileText.contains("\r") && isHTTPorHTTPSURL(fileText)) {
-                        (requireActivity() as? MainActivity)?.importSubscription(fileText)
-                    } else {
-                        onMainDispatcher {
-                            snackbar(getString(R.string.no_proxies_found_in_file)).show()
-                        }
+                if (subscriptionUrl != null) {
+                    (requireActivity() as? MainActivity)?.importSubscription(subscriptionUrl)
+                } else if (proxies.isEmpty()) {
+                    onMainDispatcher {
+                        snackbar(getString(R.string.no_proxies_found_in_file)).show()
                     }
                 } else import(proxies)
             } catch (e: Exception) {
@@ -442,15 +448,16 @@ class ConfigurationFragment @JvmOverloads constructor(
                 } else {
                     runOnDefaultDispatcher {
                         try {
-                            val proxies = RawUpdater.parseRaw(text)
-                            if (proxies.isNullOrEmpty()) {
-                                if (!text.contains("\n") && !text.contains("\r") && isHTTPorHTTPSURL(text)) {
-                                    (requireActivity() as? MainActivity)?.importSubscription(text)
-                                } else onMainDispatcher {
-                                    snackbar(getString(R.string.no_proxies_found_in_clipboard)).show()
-                                }
+                            val normalizedText = MobileTinaImportNormalizer.normalize(text).orEmpty()
+                            val subscriptionUrl =
+                                MobileTinaImportNormalizer.subscriptionUrl(normalizedText)
+                            if (subscriptionUrl != null) {
+                                (requireActivity() as? MainActivity)?.importSubscription(subscriptionUrl)
                             } else {
-                                import(proxies)
+                                val proxies = RawUpdater.parseRaw(normalizedText)
+                                if (proxies.isNullOrEmpty()) onMainDispatcher {
+                                    snackbar(getString(R.string.no_proxies_found_in_clipboard)).show()
+                                } else import(proxies)
                             }
                         } catch (e: Exception) {
                             Logs.w(e)

@@ -246,8 +246,8 @@
     <string name="subscriptions">Subscriptions</string>
     <string name="cleartext_http_warning">Cleartext HTTP traffic is insecure</string>
     <string name="error_title">Error</string>
-    <string name="no_proxies_found">No proxy found in the link</string>
-    <string name="no_proxies_found_in_subscription">No proxy found in the subscription</string>
+    <string name="no_proxies_found">هیچ سروری در این لینک یافت نشد</string>
+    <string name="no_proxies_found_in_subscription">هیچ سروری در این اشتراک یافت نشد</string>
     <string name="no_proxies_found_in_file">No proxy found in the file</string>
     <string name="no_proxies_found_in_clipboard">No proxy found in the clipboard</string>
     <string name="deduplication">Deduplication</string>

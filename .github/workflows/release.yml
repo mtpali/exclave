@@ -72,9 +72,12 @@ jobs:
           ./gradlew :app:downloadAssets
           ./gradlew :app:assembleOssRelease
           mkdir -p artifacts
-          universal_apk="$(find app/build/outputs/apk/oss/release -type f -name '*universal*.apk' -print -quit)"
+          universal_apk="$(find app/build/outputs/apk/oss/release -type f -name '*universal*.apk' ! -name '*unsigned*' -print -quit)"
           test -n "$universal_apk"
           cp "$universal_apk" artifacts/MobileTina-ARMv7-ARMv8-universal.apk
+          apksigner="${ANDROID_HOME}/build-tools/37.0.0/apksigner"
+          test -x "$apksigner"
+          "$apksigner" verify --verbose --print-certs artifacts/MobileTina-ARMv7-ARMv8-universal.apk
       - name: Upload Artifacts
         uses: actions/upload-artifact@v7
         with:

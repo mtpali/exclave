@@ -120,9 +120,10 @@ fun Project.setupAppCommon(projectName: String = "") {
         buildTypes.getByName("release") {
             @Suppress("UnstableApiUsage")
             vcsInfo.include = false
-            signingConfigs.findByName("release")?.let {
-                signingConfig = it
-            }
+            // Prefer the private production key when configured. CI builds without that
+            // secret still need a verifiably signed APK for installation and testing.
+            signingConfig = signingConfigs.findByName("release")
+                ?: signingConfigs.getByName("debug")
             ndk.debugSymbolLevel = "NONE"
         }
         buildTypes.getByName("debug") {

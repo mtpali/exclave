@@ -50,13 +50,10 @@ import io.nekohasekai.sagernet.database.ProfileManager
 import io.nekohasekai.sagernet.databinding.LayoutScannerBinding
 import io.nekohasekai.sagernet.group.RawUpdater
 import io.nekohasekai.sagernet.ktx.*
+import io.nekohasekai.sagernet.utils.MobileTinaImportNormalizer
+import io.nekohasekai.sagernet.utils.ZxingQRCodeAnalyzer
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
-import androidx.core.net.toUri
-import androidx.room.util.query
-import io.nekohasekai.sagernet.utils.ZxingQRCodeAnalyzer
-import libexclavecore.Libexclavecore
-import java.net.URI
 
 class ScannerActivity : ThemedActivity() {
 
@@ -156,35 +153,42 @@ class ScannerActivity : ThemedActivity() {
         }
     }
 
+    private suspend fun importDecodedText(rawValue: String): Boolean {
+        val normalizedValue = MobileTinaImportNormalizer.normalize(rawValue).orEmpty()
+        val subscriptionUrl = MobileTinaImportNormalizer.subscriptionUrl(normalizedValue)
+        if (subscriptionUrl != null) {
+            onMainDispatcher {
+                val uri = Uri.Builder()
+                    .scheme("exclave")
+                    .authority("subscription")
+                    .appendQueryParameter("url", subscriptionUrl)
+                    .build()
+                startActivity(Intent(this@ScannerActivity, MainActivity::class.java).apply {
+                    action = Intent.ACTION_VIEW
+                    data = uri
+                })
+            }
+            return true
+        }
+
+        val results = RawUpdater.parseRaw(normalizedValue)
+        if (results.isNullOrEmpty()) return false
+
+        val currentGroupId = DataStore.selectedGroupForImport()
+        if (DataStore.selectedGroup != currentGroupId) {
+            DataStore.selectedGroup = currentGroupId
+        }
+        for (profile in results) {
+            ProfileManager.createProfile(currentGroupId, profile)
+        }
+        return true
+    }
+
     private fun onSuccess(value: String): Boolean {
-        finish()
         runOnDefaultDispatcher {
             try {
-                val results = RawUpdater.parseRaw(value)
-                if (results.isNullOrEmpty()) {
-                    if (!value.contains("\n") && !value.contains("\r") && isHTTPorHTTPSURL(value)) {
-                        val uri = Uri.Builder()
-                            .scheme("exclave")
-                            .authority("subscription")
-                            .appendQueryParameter("url", value)
-                            .build()
-                        startActivity(Intent(this@ScannerActivity, MainActivity::class.java).apply {
-                            action = Intent.ACTION_VIEW
-                            data = uri
-                        })
-                    } else {
-                        fatalError(null)
-                    }
-                } else {
-                    val currentGroupId = DataStore.selectedGroupForImport()
-                    if (DataStore.selectedGroup != currentGroupId) {
-                        DataStore.selectedGroup = currentGroupId
-                    }
-
-                    for (profile in results) {
-                        ProfileManager.createProfile(currentGroupId, profile)
-                    }
-                }
+                if (importDecodedText(value)) onMainDispatcher { finish() }
+                else fatalError(null)
             } catch (e: Exception) {
                 fatalError(e)
             }
@@ -237,35 +241,10 @@ class ScannerActivity : ThemedActivity() {
                                 )
                             }
 
-                            val results = RawUpdater.parseRaw(result.text ?: "")
-
-                            if (!results.isNullOrEmpty()) {
-                                onMainDispatcher {
-                                    finish()
-                                    runOnDefaultDispatcher {
-                                        val currentGroupId = DataStore.selectedGroupForImport()
-                                        if (DataStore.selectedGroup != currentGroupId) {
-                                            DataStore.selectedGroup = currentGroupId
-                                        }
-
-                                        for (profile in results) {
-                                            ProfileManager.createProfile(currentGroupId, profile)
-                                        }
-                                    }
-                                }
+                            if (importDecodedText(result.text.orEmpty())) {
+                                onMainDispatcher { finish() }
                             } else {
-                                if (!result.text.contains("\n") && !result.text.contains("\r") && isHTTPorHTTPSURL(result.text)) {
-                                    val uri = Uri.Builder()
-                                        .scheme("exclave")
-                                        .authority("subscription")
-                                        .appendQueryParameter("url", result.text)
-                                        .build()
-                                    startActivity(Intent(this@ScannerActivity, MainActivity::class.java).apply {
-                                        action = Intent.ACTION_VIEW
-                                        data = uri
-                                    })
-                                    finish()
-                                } else {
+                                onMainDispatcher {
                                     Toast.makeText(app, R.string.action_import_err, Toast.LENGTH_SHORT).show()
                                 }
                             }

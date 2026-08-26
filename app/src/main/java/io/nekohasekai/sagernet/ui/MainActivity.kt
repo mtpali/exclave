@@ -84,6 +84,7 @@ import io.nekohasekai.sagernet.ktx.*
 import io.nekohasekai.sagernet.utils.PackageCache
 import io.nekohasekai.sagernet.utils.MobileTinaVault
 import io.nekohasekai.sagernet.utils.MobileTinaAssets
+import io.nekohasekai.sagernet.utils.MobileTinaImportNormalizer
 import io.noties.markwon.Markwon
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.Dispatchers
@@ -592,12 +593,19 @@ class MainActivity : ThemedActivity(),
     }
 
     suspend fun importSubscription(uri: String) {
+        val normalizedUri = MobileTinaImportNormalizer.subscriptionUrl(uri)
+        if (normalizedUri == null) {
+            onMainDispatcher {
+                alert(getString(R.string.no_proxies_found_in_subscription)).show()
+            }
+            return
+        }
         val group = ProxyGroup(
             name = MobileTinaVault.subscriptionName(),
             type = GroupType.SUBSCRIPTION,
         ).apply {
             subscription = SubscriptionBean().apply {
-                link = uri
+                link = normalizedUri
             }
         }
 
