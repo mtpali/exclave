@@ -396,7 +396,6 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
         val trafficText: TextView = binding.trafficText
         val editButton = binding.edit
         val deleteButton = binding.deleteIcon
-        val shareLayout = binding.share
 
         fun bind(proxyEntity: ProxyEntity) {
 
@@ -440,8 +439,6 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
                     .setNegativeButton(io.nekohasekai.sagernet.R.string.mobiletina_cancel, null)
                     .show()
             }
-            shareLayout.isVisible = false
-
         }
 
     }
