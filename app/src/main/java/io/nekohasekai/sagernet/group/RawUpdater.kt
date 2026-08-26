@@ -36,6 +36,8 @@ import io.nekohasekai.sagernet.fmt.wireguard.parseWireGuardConfig
 import io.nekohasekai.sagernet.ktx.*
 import io.nekohasekai.sagernet.utils.MobileTinaImportNormalizer
 import libexclavecore.Libexclavecore
+import okhttp3.OkHttpClient
+import okhttp3.Request
 import org.yaml.snakeyaml.DumperOptions
 import org.yaml.snakeyaml.LoaderOptions
 import org.yaml.snakeyaml.Yaml
@@ -48,9 +50,15 @@ import org.yaml.snakeyaml.nodes.Tag
 import org.yaml.snakeyaml.representer.Representer
 import org.yaml.snakeyaml.resolver.Resolver
 import java.util.regex.Pattern
+import java.util.concurrent.TimeUnit
 
 @Suppress("EXPERIMENTAL_API_USAGE")
 object RawUpdater : GroupUpdater() {
+
+    private data class SubscriptionDownload(
+        val body: String,
+        val userInfo: String,
+    )
 
     override suspend fun doUpdate(
         proxyGroup: ProxyGroup,
@@ -72,44 +80,72 @@ object RawUpdater : GroupUpdater() {
                 ?: error(app.getString(R.string.no_proxies_found_in_subscription))
         } else {
             val useRunningVpn = SagerNet.started && DataStore.startedProfile > 0
+            val userAgent = subscription.customUserAgent.ifEmpty { USER_AGENT }
+            val requestHeaders = subscription.httpHeaders
+                .replace("\r\n", "\n")
+                .lineSequence()
+                .filter(String::isNotEmpty)
+                .associate { header ->
+                    if (!header.contains(":")) error("invalid http header")
+                    header.substringBefore(":") to header.substringAfter(":").trimStart()
+                }
             fun executeRequest(useVpnTunnel: Boolean) = Libexclavecore.newHttpClient().apply {
                 if (useVpnTunnel) {
                     useUDS(SagerNet.deviceStorage.noBackupFilesDir.toString() + "/ipc.sock")
                 }
             }.newRequest().apply {
                 setURL(subscription.link)
-                if (subscription.customUserAgent.isNotEmpty()) {
-                    setUserAgent(subscription.customUserAgent)
-                } else {
-                    setUserAgent(USER_AGENT)
-                }
-                if (subscription.httpHeaders.isNotEmpty()) {
-                    for (header in subscription.httpHeaders.replace("\r\n", "\n").split("\n")) {
-                        if (header.isEmpty()) continue
-                        if (!header.contains(":")) error("invalid http header")
-                        setHeader(header.substringBefore(":"), header.substringAfter(":").trimStart())
-                    }
-                }
+                setUserAgent(userAgent)
+                requestHeaders.forEach { (name, value) -> setHeader(name, value) }
             }.execute()
 
             // Match MobileTinaVPN: prefer the running local VPN, but retry directly when
             // its proxy socket is not ready or cannot reach the subscription provider.
-            val response = if (useRunningVpn) {
-                try {
-                    executeRequest(useVpnTunnel = true)
-                } catch (firstError: Throwable) {
-                    Logs.w(firstError)
+            var nativeError: Throwable? = null
+            val nativeDownload = try {
+                val response = if (useRunningVpn) {
+                    try {
+                        executeRequest(useVpnTunnel = true)
+                    } catch (firstError: Throwable) {
+                        Logs.w(firstError)
+                        executeRequest(useVpnTunnel = false)
+                    }
+                } else {
                     executeRequest(useVpnTunnel = false)
                 }
-            } else {
-                executeRequest(useVpnTunnel = false)
+                SubscriptionDownload(
+                    body = response.contentString,
+                    userInfo = response.getHeader("Subscription-Userinfo"),
+                )
+            } catch (error: Throwable) {
+                Logs.w(error)
+                nativeError = error
+                null
             }
 
-            rawPayload = response.contentString
-            proxies = parseRaw(response.contentString)
-                ?: error(app.getString(R.string.no_proxies_found))
+            var download = nativeDownload
+            var parsed = download?.body?.let(::parseRaw)
 
-            val subscriptionUserinfo = response.getHeader("Subscription-Userinfo")
+            // Match MobileTinaVPN's OkHttp fetch path when Exclave's native client either
+            // fails or returns compressed/redirected/provider-specific text it cannot parse.
+            if (parsed.isNullOrEmpty()) {
+                val okhttpDownload = try {
+                    downloadWithOkHttp(subscription.link, userAgent, requestHeaders)
+                } catch (error: Throwable) {
+                    Logs.w(error)
+                    if (download == null) throw nativeError ?: error
+                    null
+                }
+                if (okhttpDownload != null) {
+                    download = okhttpDownload
+                    parsed = parseRaw(okhttpDownload.body)
+                }
+            }
+
+            rawPayload = download?.body
+            proxies = parsed ?: error(app.getString(R.string.no_proxies_found))
+
+            val subscriptionUserinfo = download?.userInfo.orEmpty()
             if (subscriptionUserinfo.isNotEmpty()) {
                 fun get(regex: String): String? {
                     return regex.toRegex().findAll(subscriptionUserinfo).mapNotNull {
@@ -275,9 +311,45 @@ object RawUpdater : GroupUpdater() {
         }
     }
 
+    private fun downloadWithOkHttp(
+        link: String,
+        userAgent: String,
+        headers: Map<String, String>,
+    ): SubscriptionDownload {
+        val client = OkHttpClient.Builder()
+            .followRedirects(true)
+            .followSslRedirects(true)
+            .connectTimeout(15, TimeUnit.SECONDS)
+            .readTimeout(15, TimeUnit.SECONDS)
+            .callTimeout(30, TimeUnit.SECONDS)
+            .build()
+        val request = Request.Builder()
+            .url(link)
+            .get()
+            .header("User-Agent", userAgent)
+            .header("Connection", "close")
+            .apply {
+                headers.forEach { (name, value) -> header(name, value) }
+            }
+            .build()
+
+        return client.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) error("HTTP ${response.code}")
+            SubscriptionDownload(
+                body = response.body.string(),
+                userInfo = response.header("Subscription-Userinfo").orEmpty(),
+            )
+        }
+    }
+
     @Suppress("UNCHECKED_CAST")
     fun parseRaw(text: String): List<AbstractBean>? {
-        val normalized = MobileTinaImportNormalizer.normalize(text) ?: text
+        return MobileTinaImportNormalizer.payloadCandidates(text)
+            .firstNotNullOfOrNull(::parseRawCandidate)
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    private fun parseRawCandidate(normalized: String): List<AbstractBean>? {
         try {
             val options = DumperOptions()
             val yaml = Yaml(YAMLConstructor(LoaderOptions()), Representer(options), options, object : Resolver() {
