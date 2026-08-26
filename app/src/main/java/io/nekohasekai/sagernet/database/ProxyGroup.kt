@@ -28,6 +28,7 @@ import io.nekohasekai.sagernet.R
 import io.nekohasekai.sagernet.fmt.Serializable
 import io.nekohasekai.sagernet.ktx.app
 import io.nekohasekai.sagernet.ktx.applyDefaultValues
+import io.nekohasekai.sagernet.utils.MobileTinaVault
 
 @Entity(tableName = "proxy_groups")
 data class ProxyGroup(
@@ -101,7 +102,7 @@ data class ProxyGroup(
     }
 
     fun displayName(): String {
-        if (ungrouped) return app.getString(R.string.mobiletina_subscription_name)
+        if (ungrouped) return MobileTinaVault.subscriptionName()
         return name.takeIf { !it.isNullOrEmpty() } ?: app.getString(R.string.group_default)
     }
 

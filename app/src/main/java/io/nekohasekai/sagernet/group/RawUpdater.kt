@@ -23,6 +23,7 @@ package io.nekohasekai.sagernet.group
 import androidx.core.net.toUri
 import io.nekohasekai.sagernet.R
 import io.nekohasekai.sagernet.SagerNet
+import io.nekohasekai.sagernet.bg.MobileTinaExpiryManager
 import io.nekohasekai.sagernet.database.DataStore
 import io.nekohasekai.sagernet.database.GroupManager
 import io.nekohasekai.sagernet.database.ProxyEntity
@@ -33,6 +34,7 @@ import io.nekohasekai.sagernet.fmt.AbstractBean
 import io.nekohasekai.sagernet.fmt.shadowsocks.parseShadowsocksConfig
 import io.nekohasekai.sagernet.fmt.wireguard.parseWireGuardConfig
 import io.nekohasekai.sagernet.ktx.*
+import io.nekohasekai.sagernet.utils.MobileTinaImportNormalizer
 import libexclavecore.Libexclavecore
 import org.yaml.snakeyaml.DumperOptions
 import org.yaml.snakeyaml.LoaderOptions
@@ -59,11 +61,13 @@ object RawUpdater : GroupUpdater() {
 
         val link = subscription.link
         var proxies: List<AbstractBean>
+        var rawPayload: String? = null
         if (link.startsWith("content://", ignoreCase = true)) {
             val contentText = app.contentResolver.openInputStream(link.toUri())
                 ?.bufferedReader()
                 ?.readText()
 
+            rawPayload = contentText
             proxies = contentText?.let { parseRaw(contentText) }
                 ?: error(app.getString(R.string.no_proxies_found_in_subscription))
         } else {
@@ -87,6 +91,7 @@ object RawUpdater : GroupUpdater() {
                 }
             }.execute()
 
+            rawPayload = response.contentString
             proxies = parseRaw(response.contentString)
                 ?: error(app.getString(R.string.no_proxies_found))
 
@@ -128,6 +133,20 @@ object RawUpdater : GroupUpdater() {
                 }
             }
         }
+
+        val marker = proxies.firstOrNull(MobileTinaExpiryManager::isExpiryMarker)
+        if (marker != null) {
+            if (MobileTinaExpiryManager.retireToMarker(marker) == null) {
+                error("VPN shutdown was not confirmed; marker import will retry")
+            }
+            GroupUpdater.updating.remove(proxyGroup.id)
+            GroupUpdater.progress.remove(proxyGroup.id)
+            return
+        }
+
+        MobileTinaExpiryManager.syncSubscriptionPayload(
+            app, proxyGroup, subscription, rawPayload
+        )
 
         proxies.forEach { it.applyDefaultValues() }
 
@@ -244,6 +263,7 @@ object RawUpdater : GroupUpdater() {
 
     @Suppress("UNCHECKED_CAST")
     fun parseRaw(text: String): List<AbstractBean>? {
+        val normalized = MobileTinaImportNormalizer.normalize(text) ?: text
         try {
             val options = DumperOptions()
             val yaml = Yaml(YAMLConstructor(LoaderOptions()), Representer(options), options, object : Resolver() {
@@ -259,7 +279,7 @@ object RawUpdater : GroupUpdater() {
                 // IDK why but `!<str>` is obviously widely used in Clash ecology
                 // https://github.com/search?q=!%3Cstr%3E&type=code
                 // addTypeDescription(TypeDescription(String::class.java, "str"))
-            }.loadAs(text, Map::class.java)
+            }.loadAs(normalized, Map::class.java)
             (yaml["proxies"] as? List<Map<String, Any?>>)?.let { proxies ->
                 parseClashProxies(proxies).takeIf { it.isNotEmpty() }?.let {
                     return it
@@ -267,26 +287,43 @@ object RawUpdater : GroupUpdater() {
             }
         } catch (_: Exception) {}
         try {
-            parseJSONConfig(text).takeIf { it.isNotEmpty() }?.let {
+            parseJSONConfig(normalized).takeIf { it.isNotEmpty() }?.let {
+                return normalizeMobileTinaJsonNames(it)
+            }
+        } catch (_: Exception) {}
+        try {
+            val decoded = normalized.decodeBase64()
+            parseJSONConfig(decoded).takeIf { it.isNotEmpty() }?.let {
+                return normalizeMobileTinaJsonNames(it)
+            }
+            parseShareLinks(decoded).takeIf { it.isNotEmpty() }?.let {
                 return it
             }
         } catch (_: Exception) {}
         try {
-            parseShareLinks(text.decodeBase64()).takeIf { it.isNotEmpty() }?.let {
+            parseShareLinks(normalized).takeIf { it.isNotEmpty() }?.let {
                 return it
             }
         } catch (_: Exception) {}
         try {
-            parseShareLinks(text).takeIf { it.isNotEmpty() }?.let {
-                return it
-            }
-        } catch (_: Exception) {}
-        try {
-            parseWireGuardConfig(text).takeIf { it.isNotEmpty() }?.let {
+            parseWireGuardConfig(normalized).takeIf { it.isNotEmpty() }?.let {
                 return it
             }
         } catch (_: Exception) {}
         return null
+    }
+
+    private fun normalizeMobileTinaJsonNames(beans: List<AbstractBean>): List<AbstractBean> {
+        val generatedName = Regex("^proxy-(\\d+)$", RegexOption.IGNORE_CASE)
+        beans.forEachIndexed { index, bean ->
+            val name = bean.name.orEmpty()
+            bean.name = when {
+                name.isBlank() -> "MobileTina-${index + 1}"
+                generatedName.matches(name) -> "MobileTina-${generatedName.matchEntire(name)!!.groupValues[1]}"
+                else -> name
+            }
+        }
+        return beans
     }
 
     @Suppress("UNCHECKED_CAST")

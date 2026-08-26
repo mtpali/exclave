@@ -73,7 +73,7 @@ class ConfigEditActivity : ThemedActivity() {
                     .setPositiveButton(android.R.string.ok) { _, _ ->
                         saveAndExit()
                     }
-                    .setNegativeButton(android.R.string.cancel) { _, _ ->
+                    .setNegativeButton(io.nekohasekai.sagernet.R.string.mobiletina_cancel) { _, _ ->
                         finish()
                     }
                     .show()

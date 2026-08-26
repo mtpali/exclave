@@ -437,7 +437,7 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
                     .setPositiveButton(android.R.string.ok) { _, _ ->
                         configurationAdapter.remove(adapterPosition)
                     }
-                    .setNegativeButton(android.R.string.cancel, null)
+                    .setNegativeButton(io.nekohasekai.sagernet.R.string.mobiletina_cancel, null)
                     .show()
             }
             shareLayout.isVisible = false

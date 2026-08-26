@@ -136,7 +136,7 @@ object DataStore : OnPreferenceDataStoreChangeListener {
     var serviceMode by configurationStore.string(Key.SERVICE_MODE) { Key.MODE_VPN }
 
     var domainStrategy by configurationStore.string(Key.DOMAIN_STRATEGY) { "AsIs" }
-    var trafficSniffing by configurationStore.boolean(Key.TRAFFIC_SNIFFING) { true }
+    var trafficSniffing by configurationStore.boolean(Key.TRAFFIC_SNIFFING) { false }
     var destinationOverride by configurationStore.boolean(Key.DESTINATION_OVERRIDE)
     var outboundDomainStrategy by configurationStore.string(Key.OUTBOUND_DOMAIN_STRATEGY) { "AsIs" }
     var outboundDomainStrategyForDirect by configurationStore.string(Key.OUTBOUND_DOMAIN_STRATEGY_FOR_DIRECT) { "AsIs" }

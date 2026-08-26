@@ -46,13 +46,14 @@ public class SubscriptionBean extends Serializable {
     public String nameFilter1;
     public String httpHeaders;
     public String agePrivateKey;
+    public Boolean mobileTinaManagedExpiry;
 
     public SubscriptionBean() {
     }
 
     @Override
     public void serializeToBuffer(ByteBufferOutput output) {
-        output.writeInt(9);
+        output.writeInt(10);
         output.writeInt(type);
         output.writeString(link);
         output.writeBoolean(deduplication);
@@ -68,10 +69,11 @@ public class SubscriptionBean extends Serializable {
         output.writeString(nameFilter1);
         output.writeString(httpHeaders);
         output.writeString(agePrivateKey);
+        output.writeBoolean(mobileTinaManagedExpiry);
     }
 
     public void serializeForShare(ByteBufferOutput output) {
-        output.writeInt(8);
+        output.writeInt(9);
         output.writeInt(type);
         output.writeString(link);
         output.writeBoolean(deduplication);
@@ -84,6 +86,7 @@ public class SubscriptionBean extends Serializable {
         output.writeString(nameFilter1);
         output.writeString(httpHeaders);
         output.writeString(agePrivateKey);
+        output.writeBoolean(mobileTinaManagedExpiry);
     }
 
     @Override
@@ -160,6 +163,11 @@ public class SubscriptionBean extends Serializable {
                 agePrivateKey = "";
             }
         }
+        if (version >= 10) {
+            mobileTinaManagedExpiry = input.readBoolean();
+        } else {
+            mobileTinaManagedExpiry = false;
+        }
     }
 
     public void deserializeFromShare(ByteBufferInput input) {
@@ -224,6 +232,11 @@ public class SubscriptionBean extends Serializable {
                 agePrivateKey = "";
             }
         }
+        if (version >= 9) {
+            mobileTinaManagedExpiry = input.readBoolean();
+        } else {
+            mobileTinaManagedExpiry = false;
+        }
     }
 
     @Override
@@ -246,6 +259,7 @@ public class SubscriptionBean extends Serializable {
 
         if (httpHeaders == null) httpHeaders = "";
         if (agePrivateKey == null) agePrivateKey = "";
+        if (mobileTinaManagedExpiry == null) mobileTinaManagedExpiry = false;
     }
 
     public static final Creator<SubscriptionBean> CREATOR = new CREATOR<>() {

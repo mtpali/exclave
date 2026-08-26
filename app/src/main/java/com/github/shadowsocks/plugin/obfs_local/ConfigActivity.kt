@@ -89,7 +89,7 @@ class ConfigActivity : ConfigurationActivity(), Toolbar.OnMenuItemClickListener 
                     saveChanges(child.options)
                     finish()
                 }
-                setNegativeButton(android.R.string.cancel) { _, _ ->
+                setNegativeButton(io.nekohasekai.sagernet.R.string.mobiletina_cancel) { _, _ ->
                     finish()
                 }
                 create()

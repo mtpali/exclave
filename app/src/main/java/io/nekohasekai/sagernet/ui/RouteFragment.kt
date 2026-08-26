@@ -218,7 +218,7 @@ class RouteFragment : ToolbarFragment(R.layout.layout_route), Toolbar.OnMenuItem
                                                 needReload()
                                             }
                                         }
-                                        .setNegativeButton(android.R.string.cancel, null)
+                                        .setNegativeButton(io.nekohasekai.sagernet.R.string.mobiletina_cancel, null)
                                         .show()
                                 }
                             } else {
@@ -334,7 +334,7 @@ class RouteFragment : ToolbarFragment(R.layout.layout_route), Toolbar.OnMenuItem
                             }
                         }
                     }
-                    .setNegativeButton(android.R.string.cancel, null)
+                    .setNegativeButton(io.nekohasekai.sagernet.R.string.mobiletina_cancel, null)
                     .show()
             }
             R.id.action_manage_assets -> {

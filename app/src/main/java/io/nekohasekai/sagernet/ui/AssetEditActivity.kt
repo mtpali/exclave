@@ -60,7 +60,7 @@ class AssetEditActivity(
                         saveAndExit()
                     }
                 }
-                .setNegativeButton(android.R.string.cancel) { _, _ ->
+                .setNegativeButton(io.nekohasekai.sagernet.R.string.mobiletina_cancel) { _, _ ->
                     finish()
                 }
                 .show()
@@ -225,7 +225,7 @@ class AssetEditActivity(
                         }
                         finish()
                     }
-                    .setNegativeButton(android.R.string.cancel, null)
+                    .setNegativeButton(io.nekohasekai.sagernet.R.string.mobiletina_cancel, null)
                     .show()
             }
             true

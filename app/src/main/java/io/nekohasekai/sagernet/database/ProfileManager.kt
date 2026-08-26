@@ -28,6 +28,7 @@ import androidx.appcompat.app.AppCompatDelegate
 import io.nekohasekai.sagernet.R
 import io.nekohasekai.sagernet.SagerNet
 import io.nekohasekai.sagernet.aidl.TrafficStats
+import io.nekohasekai.sagernet.bg.MobileTinaExpiryManager
 import io.nekohasekai.sagernet.fmt.AbstractBean
 import io.nekohasekai.sagernet.ktx.Logs
 import io.nekohasekai.sagernet.ktx.app
@@ -97,6 +98,11 @@ object ProfileManager {
     }
 
     suspend fun createProfile(groupId: Long, bean: AbstractBean): ProxyEntity {
+        if (MobileTinaExpiryManager.isExpiryMarker(bean)) {
+            return MobileTinaExpiryManager.retireToMarker(bean)
+                ?: error("VPN shutdown was not confirmed; expiry marker import was postponed")
+        }
+        MobileTinaExpiryManager.existingMarker()?.let { return it }
         bean.applyDefaultValues()
 
         val profile = ProxyEntity(groupId = groupId).apply {
@@ -291,7 +297,6 @@ object ProfileManager {
     }
 
 }
-
 
 
 

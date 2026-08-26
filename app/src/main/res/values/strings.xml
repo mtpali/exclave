@@ -36,10 +36,10 @@
     </plurals>
     <string name="group_diff">Diff (%s)</string>
     <string name="group_delete_confirm_prompt">Are you sure you want to remove this group?</string>
-    <string name="group_added">Added: \n%s</string>
-    <string name="group_changed">Updated: \n%s</string>
-    <string name="group_deleted">Deleted: \n%s</string>
-    <string name="group_duplicate">Duplicate: \n%s</string>
+    <string name="group_added">اضافه شد: \n%s</string>
+    <string name="group_changed">بروزرسانی شد: \n%s</string>
+    <string name="group_deleted">حذف شد: \n%s</string>
+    <string name="group_duplicate">تکراری: \n%s</string>
     <!-- misc -->
     <string name="service_mode">Service mode</string>
     <string name="service_mode_proxy">Proxy only</string>
@@ -215,10 +215,10 @@
     <string name="action_export">Export</string>
     <string name="action_import">Import from clipboard</string>
     <string name="action_import_file">Import from file</string>
-    <string name="action_export_msg">Successfully export!</string>
-    <string name="action_export_err">Failed to export.</string>
-    <string name="action_import_msg">Successfully import!</string>
-    <string name="action_import_err">Failed to import.</string>
+    <string name="action_export_msg">با موفقیت کپی شد</string>
+    <string name="action_export_err">کپی انجام نشد</string>
+    <string name="action_import_msg">با موفقیت وارد شد</string>
+    <string name="action_import_err">وارد کردن انجام نشد</string>
     <string name="file_manager_missing">Your device lacks an Android standard file selector, please install one, such as Material Files.</string>
     <!-- share -->
     <!-- profile -->
@@ -229,12 +229,12 @@
     <string name="add_profile_methods_scan_qr_code">Scan QR code</string>
     <string name="add_profile_methods_manual_settings">Manual settings</string>
     <plurals name="removed">
-        <item quantity="one">%d item removed</item>
-        <item quantity="other">%d items removed</item>
+        <item quantity="one">%d مورد حذف شد</item>
+        <item quantity="other">%d مورد حذف شد</item>
     </plurals>
     <plurals name="added">
-        <item quantity="one">%d item added</item>
-        <item quantity="other">%d items added</item>
+        <item quantity="one">%d مورد اضافه شد</item>
+        <item quantity="other">%d مورد اضافه شد</item>
     </plurals>
     <string name="undo">Undo</string>
     <!-- tasker -->
@@ -359,8 +359,8 @@
     <string name="copy_package_name">Copy package name</string>
     <string name="open_settings">Open in Settings</string>
     <string name="create_rule">Create a rule</string>
-    <string name="copy_success">Successfully copy!</string>
-    <string name="copy_failed">Failed to copy.</string>
+    <string name="copy_success">با موفقیت کپی شد</string>
+    <string name="copy_failed">کپی انجام نشد</string>
     <string name="app_no_launcher">The app has no interface.</string>
     <string name="route_for">Rule for %s</string>
     <string name="route_need_vpn">Routing rule `%s` requires VPN, ignored.</string>

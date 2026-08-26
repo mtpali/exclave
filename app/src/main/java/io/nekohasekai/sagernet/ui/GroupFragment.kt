@@ -22,7 +22,6 @@ package io.nekohasekai.sagernet.ui
 import android.content.Intent
 import android.os.Bundle
 import android.text.format.DateUtils
-import android.view.MotionEvent
 import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
@@ -155,7 +154,7 @@ class GroupFragment : ToolbarFragment(R.layout.layout_group),
                                 GroupUpdater.startUpdate(it, byUser = false) // Do not display changelog or error message
                             }
                     }
-                    .setNegativeButton(android.R.string.cancel, null)
+                    .setNegativeButton(io.nekohasekai.sagernet.R.string.mobiletina_cancel, null)
                     .show()
             }
         }
@@ -200,7 +199,7 @@ class GroupFragment : ToolbarFragment(R.layout.layout_group),
         }
 
         override fun onViewRecycled(holder: GroupHolder) {
-            holder.cancelSecretHold()
+            holder.resetSecretClicks()
             super.onViewRecycled(holder)
         }
 
@@ -333,7 +332,8 @@ class GroupFragment : ToolbarFragment(R.layout.layout_group),
         val optionsButton = binding.options
         val updateButton = binding.groupUpdate
         val subscriptionUpdateProgress = binding.subscriptionUpdateProgress
-        private var secretHoldRunnable: Runnable? = null
+        private var secretClickGroupId = 0L
+        private var secretClickCount = 0
 
         override fun onMenuItemClick(item: MenuItem): Boolean {
             when (item.itemId) {
@@ -345,7 +345,7 @@ class GroupFragment : ToolbarFragment(R.layout.layout_group),
                                 GroupManager.clearGroup(proxyGroup.id)
                             }
                         }
-                        .setNegativeButton(android.R.string.cancel, null)
+                        .setNegativeButton(io.nekohasekai.sagernet.R.string.mobiletina_cancel, null)
                         .show()
                 }
             }
@@ -353,46 +353,36 @@ class GroupFragment : ToolbarFragment(R.layout.layout_group),
             return true
         }
 
-        fun cancelSecretHold() {
-            secretHoldRunnable?.let(itemView::removeCallbacks)
-            secretHoldRunnable = null
+        fun resetSecretClicks() {
+            secretClickGroupId = 0L
+            secretClickCount = 0
         }
 
-        private fun installSecretHold(group: ProxyGroup) {
-            cancelSecretHold()
-            if (group.type != GroupType.SUBSCRIPTION) {
-                itemView.setOnTouchListener(null)
-                return
-            }
-            itemView.setOnTouchListener { view, event ->
-                when (event.actionMasked) {
-                    MotionEvent.ACTION_DOWN -> {
-                        cancelSecretHold()
-                        val reveal = Runnable {
-                            secretHoldRunnable = null
-                            if (view.isAttachedToWindow && proxyGroup.id == group.id) {
-                                revealSubscription(group)
-                            }
-                        }
-                        secretHoldRunnable = reveal
-                        view.postDelayed(reveal, SUBSCRIPTION_SECRET_HOLD_MS)
-                    }
-                    MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> cancelSecretHold()
+        private fun installSecretClicks(group: ProxyGroup) {
+            resetSecretClicks()
+            itemView.setOnClickListener {
+                if (secretClickGroupId != group.id) {
+                    secretClickGroupId = group.id
+                    secretClickCount = 0
                 }
-                false
+                secretClickCount++
+                if (secretClickCount >= SUBSCRIPTION_SECRET_CLICK_COUNT) {
+                    resetSecretClicks()
+                    if (itemView.isAttachedToWindow && proxyGroup.id == group.id) {
+                        revealSubscription(group)
+                    }
+                }
             }
         }
 
         fun bind(group: ProxyGroup) {
             proxyGroup = group
 
-            itemView.setOnClickListener(null)
-
             editButton.isGone = group.ungrouped || group.type == GroupType.SUBSCRIPTION
             updateButton.isVisible = group.type == GroupType.SUBSCRIPTION
             optionsButton.isGone = false
             groupName.text = group.displayName()
-            installSecretHold(group)
+            installSecretClicks(group)
 
             editButton.setOnClickListener {
                 startActivity(Intent(it.context, GroupSettingsActivity::class.java).apply {
@@ -547,7 +537,7 @@ class GroupFragment : ToolbarFragment(R.layout.layout_group),
                 val success = SagerNet.trySetPrimaryClip(link)
                 snackbar(if (success) R.string.action_export_msg else R.string.action_export_err).show()
             }
-            .setNegativeButton(android.R.string.cancel, null)
+            .setNegativeButton(io.nekohasekai.sagernet.R.string.mobiletina_cancel, null)
             .show()
     }
 
@@ -571,7 +561,7 @@ class GroupFragment : ToolbarFragment(R.layout.layout_group),
     }
 
     companion object {
-        private const val SUBSCRIPTION_SECRET_HOLD_MS = 10_000L
+        private const val SUBSCRIPTION_SECRET_CLICK_COUNT = 10
     }
 
 }

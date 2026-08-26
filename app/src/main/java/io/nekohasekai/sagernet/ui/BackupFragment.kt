@@ -280,7 +280,7 @@ class BackupFragment : NamedFragment(R.layout.layout_backup) {
                         }
                     }
                 }
-                .setNegativeButton(android.R.string.cancel, null)
+                .setNegativeButton(io.nekohasekai.sagernet.R.string.mobiletina_cancel, null)
                 .show()
         }
     }

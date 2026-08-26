@@ -48,6 +48,7 @@ import androidx.core.content.getSystemService
 import androidx.core.os.LocaleListCompat
 import go.Seq
 import io.nekohasekai.sagernet.bg.SagerConnection
+import io.nekohasekai.sagernet.bg.MobileTinaExpiryManager
 import io.nekohasekai.sagernet.bg.SubscriptionUpdater
 import io.nekohasekai.sagernet.bg.test.DebugInstance
 import io.nekohasekai.sagernet.database.DataStore
@@ -122,6 +123,10 @@ class SagerNet : Application(),
         }
 
         val isMainProcess = processName == BuildConfig.APPLICATION_ID
+
+        if (isMainProcess) {
+            MobileTinaExpiryManager.recoverPending(this)
+        }
 
         if (!isMainProcess) {
             Libexclavecore.setUidDumper(this, Build.VERSION.SDK_INT < Build.VERSION_CODES.Q)

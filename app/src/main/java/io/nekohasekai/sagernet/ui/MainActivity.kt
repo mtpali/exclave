@@ -22,10 +22,16 @@
 package io.nekohasekai.sagernet.ui
 
 import android.content.Intent
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.content.res.ColorStateList
 import android.Manifest
 import android.net.Uri
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
+import android.net.VpnService
 import android.os.Build
 import android.os.Bundle
 import android.os.RemoteException
@@ -41,6 +47,7 @@ import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.IdRes
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -61,6 +68,7 @@ import io.nekohasekai.sagernet.aidl.AppStats
 import io.nekohasekai.sagernet.aidl.ISagerNetService
 import io.nekohasekai.sagernet.aidl.TrafficStats
 import io.nekohasekai.sagernet.bg.BaseService
+import io.nekohasekai.sagernet.bg.MobileTinaExpiryManager
 import io.nekohasekai.sagernet.bg.SagerConnection
 import io.nekohasekai.sagernet.bg.SubscriptionUpdater
 import io.nekohasekai.sagernet.bg.test.V2RayTestInstance
@@ -74,6 +82,8 @@ import io.nekohasekai.sagernet.group.GroupInterfaceAdapter
 import io.nekohasekai.sagernet.group.GroupUpdater
 import io.nekohasekai.sagernet.ktx.*
 import io.nekohasekai.sagernet.utils.PackageCache
+import io.nekohasekai.sagernet.utils.MobileTinaVault
+import io.nekohasekai.sagernet.utils.MobileTinaAssets
 import io.noties.markwon.Markwon
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.Dispatchers
@@ -109,6 +119,22 @@ class MainActivity : ThemedActivity(),
     private var swipeDownX = 0f
     private var swipeDownY = 0f
     private var showingHome = true
+    private var expiryReceiverRegistered = false
+    private var internetDialogVisible = false
+    private var requestInitialVpnPermission = false
+
+    private val vpnPermissionOnly = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { }
+
+    private val expiryDataReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action != MobileTinaExpiryManager.ACTION_DATA_CHANGED) return
+            updateMobileTinaState(state)
+            refreshSubscriptionCard()
+            if (showingHome) displayFragmentWithId(R.id.nav_configuration)
+        }
+    }
 
     override val onBackPressedCallback = object : OnBackPressedCallback(enabled = false) {
         override fun handleOnBackPressed() {
@@ -227,7 +253,7 @@ class MainActivity : ThemedActivity(),
                 DataStore.configurationStore.putBoolean(welcomeKey, true)
                 MaterialAlertDialogBuilder(this@MainActivity)
                     .setTitle(R.string.mobiletina_app_title)
-                    .setMessage(R.string.mobiletina_welcome_message)
+                    .setMessage(MobileTinaVault.welcome())
                     .setCancelable(false)
                     .setPositiveButton(android.R.string.ok) { _, _ -> requestPermissions() }
                     .show()
@@ -267,10 +293,18 @@ class MainActivity : ThemedActivity(),
     }
 
     private fun toggleService() {
+        if (MobileTinaExpiryManager.hasExpiryMarker()) {
+            showExpiredState()
+            return
+        }
         if (state.canStop) SagerNet.stopService() else connect.launch(null)
     }
 
     private fun smartConnectOrStop() {
+        if (MobileTinaExpiryManager.hasExpiryMarker()) {
+            showExpiredState()
+            return
+        }
         if (state.canStop || smartConnectJob?.isActive == true) {
             cancelSmartConnect()
             if (state.canStop) SagerNet.stopService()
@@ -421,6 +455,10 @@ class MainActivity : ThemedActivity(),
 
     private fun refreshSubscriptionCard() {
         lifecycleScope.launchWhenStarted {
+            if (MobileTinaExpiryManager.hasExpiryMarker()) {
+                binding.subscriptionCard.visibility = View.GONE
+                return@launchWhenStarted
+            }
             val group = withContext(Dispatchers.IO) {
                 SagerDatabase.groupDao.getById(DataStore.currentGroupId())
             }
@@ -429,23 +467,37 @@ class MainActivity : ThemedActivity(),
                 binding.subscriptionCard.visibility = View.GONE
                 return@launchWhenStarted
             }
+            val hasTraffic = subscription.bytesUsed >= 0L && subscription.bytesRemaining >= 0L &&
+                    (subscription.bytesUsed > 0L || subscription.bytesRemaining > 0L)
+            val hasExpiry = subscription.expiryDate > 0L
+            if (!hasTraffic && !hasExpiry) {
+                binding.subscriptionCard.visibility = View.GONE
+                return@launchWhenStarted
+            }
             val used = subscription.bytesUsed.coerceAtLeast(0L)
             val remaining = subscription.bytesRemaining.coerceAtLeast(0L)
             val total = used + remaining
             val gb = 1024.0 * 1024.0 * 1024.0
             val days = if (subscription.expiryDate > 0L) {
-                (((subscription.expiryDate * 1000L) - System.currentTimeMillis()) / 86_400_000L)
+                (((subscription.expiryDate * 1000L) - MobileTinaExpiryManager.trustedNowMillis(this@MainActivity)) / 86_400_000L)
                     .coerceAtLeast(0L)
             } else 0L
             binding.subscriptionCard.visibility = View.VISIBLE
             binding.tvSubscriptionName.text = group.displayName()
-            binding.tvSubscriptionDays.text = getString(R.string.mobiletina_days_remaining, days)
-            binding.tvSubscriptionTraffic.text = getString(
-                R.string.mobiletina_traffic_summary, used / gb, total / gb
-            )
-            binding.subscriptionProgress.progress = if (total > 0L) {
-                ((used * 100L) / total).toInt().coerceIn(0, 100)
-            } else 0
+            binding.tvSubscriptionDays.visibility = if (hasExpiry) View.VISIBLE else View.GONE
+            binding.tvSubscriptionDays.text = if (hasExpiry) {
+                getString(R.string.mobiletina_days_remaining, days)
+            } else ""
+            binding.tvSubscriptionTraffic.visibility = if (hasTraffic) View.VISIBLE else View.GONE
+            binding.subscriptionProgress.visibility = if (hasTraffic) View.VISIBLE else View.GONE
+            if (hasTraffic) {
+                binding.tvSubscriptionTraffic.text = getString(
+                    R.string.mobiletina_traffic_summary, used / gb, total / gb
+                )
+                binding.subscriptionProgress.progress = if (total > 0L) {
+                    ((used * 100L) / total).toInt().coerceIn(0, 100)
+                } else 0
+            }
         }
     }
 
@@ -487,6 +539,15 @@ class MainActivity : ThemedActivity(),
             }
         }
         val permissions = mutableListOf<String>()
+        val initialPermissionKey = "mobileTinaInitialPermissionsRequestedV1"
+        if (DataStore.configurationStore.getBoolean(initialPermissionKey) != true) {
+            DataStore.configurationStore.putBoolean(initialPermissionKey, true)
+            requestInitialVpnPermission = true
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) !=
+                PackageManager.PERMISSION_GRANTED) {
+                permissions.add(Manifest.permission.CAMERA)
+            }
+        }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (!DataStore.postNotificationsPermissionRequested) {
                 DataStore.postNotificationsPermissionRequested = true
@@ -504,8 +565,23 @@ class MainActivity : ThemedActivity(),
             }
         }
         if (permissions.isNotEmpty()) {
-            ActivityCompat.requestPermissions(this@MainActivity, permissions.toTypedArray(), 0)
+            ActivityCompat.requestPermissions(this@MainActivity, permissions.toTypedArray(), INITIAL_PERMISSION_REQUEST)
+        } else if (requestInitialVpnPermission) requestVpnPermissionOnly()
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray,
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == INITIAL_PERMISSION_REQUEST && requestInitialVpnPermission) {
+            requestVpnPermissionOnly()
         }
+    }
+
+    private fun requestVpnPermissionOnly() {
+        VpnService.prepare(this)?.let { vpnPermissionOnly.launch(it) }
     }
 
     fun urlTest(): Int {
@@ -517,7 +593,7 @@ class MainActivity : ThemedActivity(),
 
     suspend fun importSubscription(uri: String) {
         val group = ProxyGroup(
-            name = getString(R.string.mobiletina_subscription_name),
+            name = MobileTinaVault.subscriptionName(),
             type = GroupType.SUBSCRIPTION,
         ).apply {
             subscription = SubscriptionBean().apply {
@@ -571,7 +647,7 @@ class MainActivity : ThemedActivity(),
                         finishImportProfile(profile)
                     }
                 }
-                .setNegativeButton(android.R.string.cancel, null)
+                .setNegativeButton(io.nekohasekai.sagernet.R.string.mobiletina_cancel, null)
                 .show()
         }
 
@@ -610,7 +686,7 @@ class MainActivity : ThemedActivity(),
             MaterialAlertDialogBuilder(this)
                 .setTitle(R.string.mobiletina_clear_all)
                 .setMessage(R.string.mobiletina_clear_all_message)
-                .setNegativeButton(android.R.string.cancel, null)
+                .setNegativeButton(io.nekohasekai.sagernet.R.string.mobiletina_cancel, null)
                 .setPositiveButton(R.string.mobiletina_clear_all_confirm) { _, _ -> clearAllConfigurations() }
                 .show()
             return true
@@ -751,16 +827,20 @@ class MainActivity : ThemedActivity(),
         profileName: String? = null,
         failed: Boolean = false,
     ) {
-        val (image, status) = if (failed) {
-            R.drawable.mt_auto_red to R.string.mobiletina_status_failed
-        } else when (state) {
-            BaseService.State.Connected -> R.drawable.mt_auto_blue to R.string.mobiletina_status_connected
-            BaseService.State.Connecting, BaseService.State.Stopping ->
-                R.drawable.mt_auto_yellow to R.string.mobiletina_status_connecting
-            BaseService.State.Idle, BaseService.State.Stopped ->
-                R.drawable.mt_auto_white to R.string.mobiletina_status_disconnected
+        if (MobileTinaExpiryManager.hasExpiryMarker()) {
+            showExpiredState()
+            return
         }
-        binding.fabAuto.setImageResource(image)
+        val (image, status) = if (failed) {
+            MobileTinaAssets.State.RED to R.string.mobiletina_status_failed
+        } else when (state) {
+            BaseService.State.Connected -> MobileTinaAssets.State.BLUE to R.string.mobiletina_status_connected
+            BaseService.State.Connecting, BaseService.State.Stopping ->
+                MobileTinaAssets.State.YELLOW to R.string.mobiletina_status_connecting
+            BaseService.State.Idle, BaseService.State.Stopped ->
+                MobileTinaAssets.State.WHITE to R.string.mobiletina_status_disconnected
+        }
+        MobileTinaAssets.apply(binding.fabAuto, image)
         binding.tvAutoStatus.setText(status)
         val visibleProfile = profileName?.takeUnless { it.equals("Idle", ignoreCase = true) }
         if (state == BaseService.State.Idle || state == BaseService.State.Stopped) {
@@ -782,6 +862,17 @@ class MainActivity : ThemedActivity(),
             if (state == BaseService.State.Connected) R.drawable.mt_manual_fab
             else R.drawable.mt_manual_stop
         )
+    }
+
+    private fun showExpiredState() {
+        MobileTinaAssets.apply(binding.fabAuto, MobileTinaAssets.State.RED)
+        MobileTinaAssets.apply(binding.fabManual, MobileTinaAssets.State.RED)
+        binding.tvAutoStatus.text = MobileTinaVault.expired()
+        binding.tvAutoServer.text = ""
+        binding.tvAutoPing.visibility = View.GONE
+        binding.tvAutoPing.text = ""
+        binding.tvManualSelected.text = MobileTinaVault.expired()
+        binding.subscriptionCard.visibility = View.GONE
     }
 
     override fun snackbarInternal(text: CharSequence): Snackbar {
@@ -984,13 +1075,47 @@ class MainActivity : ThemedActivity(),
 
     override fun onStart() {
         super.onStart()
+        if (!expiryReceiverRegistered) {
+            val filter = IntentFilter(MobileTinaExpiryManager.ACTION_DATA_CHANGED)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                registerReceiver(expiryDataReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+            } else {
+                @Suppress("DEPRECATION")
+                registerReceiver(expiryDataReceiver, filter)
+            }
+            expiryReceiverRegistered = true
+        }
         connection.bandwidthTimeout = 1000
         GroupManager.userInterface = userInterface
     }
 
     override fun onResume() {
         super.onResume()
+        MobileTinaExpiryManager.recoverPending(this)
+        showOfflineDialogIfNeeded()
+        updateMobileTinaState(state)
         refreshSubscriptionsOnResume()
+    }
+
+    private fun showOfflineDialogIfNeeded() {
+        if (hasValidatedInternet() || internetDialogVisible || isFinishing || isDestroyed) return
+        internetDialogVisible = true
+        MaterialAlertDialogBuilder(this)
+            .setMessage(R.string.mobiletina_enable_internet)
+            .setPositiveButton(android.R.string.ok, null)
+            .setOnDismissListener { internetDialogVisible = false }
+            .show()
+    }
+
+    @Suppress("DEPRECATION")
+    private fun hasValidatedInternet(): Boolean {
+        val manager = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val network = manager.activeNetwork ?: return false
+            val capabilities = manager.getNetworkCapabilities(network) ?: return false
+            capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
+                    capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+        } else manager.activeNetworkInfo?.isConnected == true
     }
 
     private fun refreshSubscriptionsOnResume() {
@@ -1030,6 +1155,10 @@ class MainActivity : ThemedActivity(),
     override fun onStop() {
         connection.bandwidthTimeout = 0
         GroupManager.userInterface = null
+        if (expiryReceiverRegistered) {
+            unregisterReceiver(expiryDataReceiver)
+            expiryReceiverRegistered = false
+        }
         super.onStop()
     }
 
@@ -1065,6 +1194,7 @@ class MainActivity : ThemedActivity(),
     }
 
     companion object {
+        private const val INITIAL_PERMISSION_REQUEST = 901
         private const val SUBSCRIPTION_ENTRY_HOLD_MS = 10_000L
         private const val SUBSCRIPTION_REFRESH_GUARD_MS = 30_000L
     }

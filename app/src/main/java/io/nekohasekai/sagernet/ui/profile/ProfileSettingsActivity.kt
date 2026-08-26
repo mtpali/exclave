@@ -65,7 +65,7 @@ abstract class ProfileSettingsActivity<T : AbstractBean>(
                         saveAndExit()
                     }
                 }
-                .setNegativeButton(android.R.string.cancel) { _, _ ->
+                .setNegativeButton(io.nekohasekai.sagernet.R.string.mobiletina_cancel) { _, _ ->
                     finish()
                 }
                 .show()
@@ -188,7 +188,7 @@ abstract class ProfileSettingsActivity<T : AbstractBean>(
                         }
                         finish()
                     }
-                    .setNegativeButton(android.R.string.cancel, null)
+                    .setNegativeButton(io.nekohasekai.sagernet.R.string.mobiletina_cancel, null)
                     .show()
             }
             true

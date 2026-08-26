@@ -65,7 +65,7 @@ class TaskerActivity : ThemedActivity(R.layout.layout_config_settings),
                         saveAndExit()
                     }
                 }
-                .setNegativeButton(android.R.string.cancel) { _, _ ->
+                .setNegativeButton(io.nekohasekai.sagernet.R.string.mobiletina_cancel) { _, _ ->
                     finish()
                 }
                 .show()

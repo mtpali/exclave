@@ -56,16 +56,13 @@ import io.nekohasekai.sagernet.bg.test.V2RayTestInstance
 import io.nekohasekai.sagernet.database.*
 import io.nekohasekai.sagernet.databinding.LayoutProfileListBinding
 import io.nekohasekai.sagernet.fmt.AbstractBean
-import io.nekohasekai.sagernet.fmt.exportBackup
 import io.nekohasekai.sagernet.fmt.v2ray.StandardV2RayBean
-import io.nekohasekai.sagernet.fmt.wireguard.toConf
 import io.nekohasekai.sagernet.group.GroupUpdater
 import io.nekohasekai.sagernet.group.Protocols
 import io.nekohasekai.sagernet.group.RawUpdater
 import io.nekohasekai.sagernet.ktx.*
 import io.nekohasekai.sagernet.plugin.PluginManager
 import io.nekohasekai.sagernet.ui.profile.*
-import io.nekohasekai.sagernet.widget.QRCodeDialog
 import io.nekohasekai.sagernet.widget.UndoSnackbarManager
 import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Mutex
@@ -398,7 +395,7 @@ class ConfigurationFragment @JvmOverloads constructor(
                             finishImport(proxies)
                         }
                     }
-                    .setNegativeButton(android.R.string.cancel, null)
+                    .setNegativeButton(io.nekohasekai.sagernet.R.string.mobiletina_cancel, null)
                     .show()
             }
         }
@@ -636,7 +633,7 @@ class ConfigurationFragment @JvmOverloads constructor(
                                         }
                                     }
                                 }
-                                .setNegativeButton(android.R.string.cancel, null)
+                                .setNegativeButton(io.nekohasekai.sagernet.R.string.mobiletina_cancel, null)
                                 .show()
                         }
                     }
@@ -685,7 +682,7 @@ class ConfigurationFragment @JvmOverloads constructor(
                                         }
                                     }
                                 }
-                                .setNegativeButton(android.R.string.cancel, null)
+                                .setNegativeButton(io.nekohasekai.sagernet.R.string.mobiletina_cancel, null)
                                 .show()
                         }
                     }
@@ -1454,8 +1451,7 @@ class ConfigurationFragment @JvmOverloads constructor(
         val profileAccess = Mutex()
         val reloadAccess = Mutex()
 
-        inner class ConfigurationHolder(val view: View) : RecyclerView.ViewHolder(view),
-            PopupMenu.OnMenuItemClickListener {
+        inner class ConfigurationHolder(val view: View) : RecyclerView.ViewHolder(view) {
 
             lateinit var entity: ProxyEntity
 
@@ -1467,9 +1463,6 @@ class ConfigurationFragment @JvmOverloads constructor(
             val trafficText: TextView = view.findViewById(R.id.traffic_text)
             val selectedView: LinearLayout = view.findViewById(R.id.selected_view)
             val editButton: ImageView = view.findViewById(R.id.edit)
-            val shareLayout: LinearLayout = view.findViewById(R.id.share)
-            val shareLayer: LinearLayout = view.findViewById(R.id.share_layer)
-            val shareButton: ImageView = view.findViewById(R.id.shareIcon)
             val deleteButton: ImageView = view.findViewById(R.id.deleteIcon)
 
             fun bind(proxyEntity: ProxyEntity) {
@@ -1622,11 +1615,9 @@ class ConfigurationFragment @JvmOverloads constructor(
                 // suppress ItemTouchHelper drag while a row button is held, to avoid conflict with parent item's long-press
                 deleteButton.suppressDragWhilePressed { actionButtonPressed = it }
                 editButton.suppressDragWhilePressed { actionButtonPressed = it }
-                shareLayout.suppressDragWhilePressed { actionButtonPressed = it }
 
                 editButton.isGone = parent.select || parent.mobileTinaPresentation
                 deleteButton.isGone = parent.select || parent.mobileTinaPresentation
-                shareButton.isGone = parent.select || parent.mobileTinaPresentation
 
                 runOnDefaultDispatcher {
                     val selected = (parent.selectedItem?.id
@@ -1637,54 +1628,6 @@ class ConfigurationFragment @JvmOverloads constructor(
                         selectedView.visibility = if (selected) View.VISIBLE else View.INVISIBLE
                     }
 
-                    fun showShare(anchor: View) {
-                        val popup = PopupMenu(requireContext(), anchor)
-                        popup.menuInflater.inflate(R.menu.profile_share_menu, popup.menu)
-
-                        if (!proxyEntity.hasShareLink() && proxyEntity.wgBean == null) {
-                            popup.menu.removeItem(R.id.action_qr)
-                            popup.menu.removeItem(R.id.action_clipboard)
-                        }
-                        if (showBackup && proxyEntity.canExportBackup()) {
-                            popup.menu.findItem(R.id.action_export_backup).isVisible = true
-                        }
-
-                        popup.setOnMenuItemClickListener(this@ConfigurationHolder)
-                        popup.show()
-                    }
-
-                    if (!parent.select) {
-                        val isInsecure = DataStore.profileSecurityAdvisory && proxyEntity.requireBean().isInsecure
-                        onMainDispatcher {
-                            if (isInsecure) {
-                                shareLayer.setBackgroundColor(Color.RED)
-                                shareButton.setImageResource(R.drawable.ic_baseline_warning_24)
-                                shareButton.setColorFilter(Color.WHITE)
-                            } else {
-                                shareLayer.setBackgroundColor(Color.TRANSPARENT)
-                                shareButton.setImageResource(R.drawable.ic_social_share)
-                                shareButton.setColorFilter(Color.GRAY)
-
-                            }
-                            shareButton.isVisible = !parent.mobileTinaPresentation
-                            if (isInsecure) {
-                                shareLayout.setOnClickListener {
-                                    MaterialAlertDialogBuilder(requireContext())
-                                        .setTitle(R.string.insecure_warn)
-                                        .setMessage(R.string.insecure_warning_detail)
-                                        .setPositiveButton(android.R.string.ok) { _, _ ->
-                                            showShare(it)
-                                        }
-                                        .show()
-                                }
-                            } else {
-                                shareLayout.setOnClickListener {
-                                    showShare(it)
-                                }
-                            }
-
-                        }
-                    }
                 }
 
             }
@@ -1732,50 +1675,6 @@ class ConfigurationFragment @JvmOverloads constructor(
                 }
             }
 
-            fun showCode(link: String) {
-                QRCodeDialog(link).showAllowingStateLoss(parentFragmentManager)
-            }
-
-            fun export(link: String) {
-                val success = SagerNet.trySetPrimaryClip(link)
-                (activity as MainActivity).snackbar(if (success) R.string.action_export_msg else R.string.action_export_err)
-                    .show()
-            }
-
-            override fun onMenuItemClick(item: MenuItem): Boolean {
-                try {
-                    when (item.itemId) {
-                        R.id.action_qr -> {
-                            if (entity.wgBean != null) {
-                                entity.wgBean?.toConf()?.let { showCode(it) }
-                            } else {
-                                entity.toLink()?.let { showCode(it) }
-                            }
-                        }
-                        R.id.action_clipboard -> {
-                            if (entity.wgBean != null) {
-                                entity.wgBean?.toConf()?.let { export(it) }
-                            } else {
-                                entity.toLink()?.let { export(it) }
-                            }
-                        }
-                        R.id.action_export_config_clipboard -> export(entity.exportConfig().first)
-                        R.id.action_export_config_file -> {
-                            val cfg = entity.exportConfig()
-                            DataStore.serverConfig = cfg.first
-                            startFilesForResult(
-                                (parentFragment as ConfigurationFragment).exportConfig, cfg.second
-                            )
-                        }
-                        R.id.action_export_backup_clipboard -> export(entity.requireBean().exportBackup())
-                    }
-                } catch (e: Exception) {
-                    Logs.w(e)
-                    (activity as MainActivity).snackbar(e.readableMessage).show()
-                    return true
-                }
-                return true
-            }
         }
 
         private val editProfileLauncher =

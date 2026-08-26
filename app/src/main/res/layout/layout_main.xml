@@ -111,7 +111,7 @@
                     android:layout_width="236dp" android:layout_height="236dp"
                     android:background="@android:color/transparent" android:clickable="true"
                     android:contentDescription="@string/mobiletina_connect_action" android:focusable="true"
-                    android:scaleType="fitCenter" android:src="@drawable/mt_auto_white"
+                    android:scaleType="fitCenter" android:src="@android:color/transparent"
                     app:shapeAppearanceOverlay="@style/MobileTinaCircleFab" />
                 <TextView android:id="@+id/tv_auto_status" android:layout_width="wrap_content"
                     android:layout_height="wrap_content" android:layout_marginTop="18dp" android:gravity="center"
@@ -167,14 +167,14 @@
                 android:background="@color/mobiletina_manual_dock_bg"
                 android:clipChildren="false" android:clipToPadding="false" android:visibility="gone">
                 <com.google.android.material.imageview.ShapeableImageView
-                    android:id="@+id/fab_manual" android:layout_width="88dp" android:layout_height="88dp"
-                    android:layout_gravity="top|center_horizontal" android:translationY="-27dp"
+                    android:id="@+id/fab_manual" android:layout_width="89dp" android:layout_height="89dp"
+                    android:layout_gravity="top|center_horizontal" android:translationY="-28dp"
                     android:background="@android:color/transparent" android:clickable="true"
                     android:focusable="true" android:scaleType="fitCenter"
                     android:src="@drawable/mt_manual_stop" />
                 <com.google.android.material.imageview.ShapeableImageView
-                    android:id="@+id/btn_smart_connect" android:layout_width="142dp" android:layout_height="46dp"
-                    android:layout_gravity="top|center_horizontal" android:layout_marginTop="62dp"
+                    android:id="@+id/btn_smart_connect" android:layout_width="143dp" android:layout_height="47dp"
+                    android:layout_gravity="top|center_horizontal" android:layout_marginTop="61dp"
                     android:background="@android:color/transparent" android:clickable="true"
                     android:focusable="true" android:scaleType="fitCenter"
                     android:src="@drawable/mt_manual_auto" />

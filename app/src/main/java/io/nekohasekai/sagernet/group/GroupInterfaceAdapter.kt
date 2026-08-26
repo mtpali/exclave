@@ -44,7 +44,7 @@ class GroupInterfaceAdapter(val context: ThemedActivity) : GroupManager.Interfac
                 MaterialAlertDialogBuilder(context).setTitle(R.string.confirm)
                     .setMessage(message)
                     .setPositiveButton(android.R.string.ok) { _, _ -> tryResume(true) }
-                    .setNegativeButton(android.R.string.cancel) { _, _ -> tryResume(false) }
+                    .setNegativeButton(io.nekohasekai.sagernet.R.string.mobiletina_cancel) { _, _ -> tryResume(false) }
                     .setOnCancelListener { _ -> tryResume(false) }
                     .show()
             }

@@ -143,7 +143,7 @@ class ColorPickerPreference
 
         dialog = MaterialAlertDialogBuilder(context).setTitle(title)
             .setView(scrollView)
-            .setNegativeButton(android.R.string.cancel, null)
+            .setNegativeButton(io.nekohasekai.sagernet.R.string.mobiletina_cancel, null)
             .show()
     }
 }
