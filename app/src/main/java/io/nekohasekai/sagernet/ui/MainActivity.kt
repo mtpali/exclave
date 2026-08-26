@@ -71,7 +71,6 @@ import io.nekohasekai.sagernet.bg.BaseService
 import io.nekohasekai.sagernet.bg.MobileTinaExpiryManager
 import io.nekohasekai.sagernet.bg.SagerConnection
 import io.nekohasekai.sagernet.bg.SubscriptionUpdater
-import io.nekohasekai.sagernet.bg.test.V2RayTestInstance
 import io.nekohasekai.sagernet.database.*
 import io.nekohasekai.sagernet.database.preference.OnPreferenceDataStoreChangeListener
 import io.nekohasekai.sagernet.databinding.LayoutMainBinding
@@ -85,15 +84,11 @@ import io.nekohasekai.sagernet.utils.PackageCache
 import io.nekohasekai.sagernet.utils.MobileTinaVault
 import io.nekohasekai.sagernet.utils.MobileTinaAssets
 import io.nekohasekai.sagernet.utils.MobileTinaImportNormalizer
+import io.nekohasekai.sagernet.utils.MobileTinaSmartConnect
 import io.noties.markwon.Markwon
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.sync.Semaphore
-import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 
@@ -315,16 +310,17 @@ class MainActivity : ThemedActivity(),
         updateMobileTinaState(BaseService.State.Connecting)
         binding.tvAutoServer.setText(R.string.mobiletina_testing)
         smartConnectJob = lifecycleScope.launchWhenStarted {
-            val profiles = withContext(Dispatchers.IO) {
-                SagerDatabase.proxyDao.getByGroup(DataStore.currentGroupId())
-            }
+            val profiles = loadSmartConnectProfiles(generation)
             if (generation != smartConnectGeneration) return@launchWhenStarted
             if (profiles.isEmpty()) {
                 markSmartConnectFailed(getString(R.string.no_proxies_found))
                 return@launchWhenStarted
             }
-            val best = if (profiles.size == 1) profiles.first()
-            else testAndSelectBest(profiles, generation)
+            val best = MobileTinaSmartConnect.selectBest(
+                profiles = profiles,
+                selectedProxy = DataStore.selectedProxy,
+                isCurrent = { generation == smartConnectGeneration },
+            )
             if (generation != smartConnectGeneration) return@launchWhenStarted
             if (best == null) {
                 markSmartConnectFailed(getString(R.string.mobiletina_no_working_server))
@@ -344,35 +340,36 @@ class MainActivity : ThemedActivity(),
         }
     }
 
-    private suspend fun testAndSelectBest(
-        profiles: List<ProxyEntity>, generation: Long,
-    ): ProxyEntity? = coroutineScope {
-        val semaphore = Semaphore(6)
-        suspend fun test(profile: ProxyEntity): ProxyEntity? = semaphore.withPermit {
-            if (generation != smartConnectGeneration) return@withPermit null
-            runCatching {
-                val result = V2RayTestInstance(
-                    profile, DataStore.connectionTestURL, 3_500
-                ).use { it.doTest() }
-                profile.status = 1
-                profile.ping = result
-                profile.error = null
-                ProfileManager.updateProfile(profile)
-                profile.takeIf { result > 0 }
-            }.getOrElse {
-                profile.status = 3
-                profile.ping = 0
-                profile.error = it.readableMessage
-                ProfileManager.updateProfile(profile)
-                null
+    private suspend fun loadSmartConnectProfiles(generation: Long): List<ProxyEntity> {
+        val group = withContext(Dispatchers.IO) {
+            SagerDatabase.groupDao.getById(DataStore.currentGroupId())
+        } ?: return emptyList()
+
+        suspend fun load(): List<ProxyEntity> = withContext(Dispatchers.IO) {
+            SagerDatabase.proxyDao.getByGroup(group.id)
+        }
+
+        var profiles = load()
+        if (profiles.isNotEmpty() || group.subscription?.link.isNullOrBlank()) return profiles
+
+        // A foreground refresh may already be filling this empty group. Wait briefly for it
+        // instead of starting a duplicate request, then force one refresh only if still needed.
+        if (group.id in GroupUpdater.updating) {
+            withTimeoutOrNull(SMART_CONNECT_SUBSCRIPTION_WAIT_MS) {
+                while (group.id in GroupUpdater.updating && generation == smartConnectGeneration) {
+                    delay(100L)
+                }
             }
+            if (generation != smartConnectGeneration) return emptyList()
+            profiles = load()
         }
-        var working = profiles.map { async(Dispatchers.IO) { test(it) } }.awaitAll().filterNotNull()
-        if (working.isEmpty() && generation == smartConnectGeneration) {
-            delay(350L)
-            working = profiles.map { async(Dispatchers.IO) { test(it) } }.awaitAll().filterNotNull()
+        if (profiles.isEmpty() && group.id !in GroupUpdater.updating) {
+            withContext(Dispatchers.IO) {
+                SubscriptionUpdater.refreshGroup(group, force = true)
+            }
+            if (generation == smartConnectGeneration) profiles = load()
         }
-        working.minByOrNull { it.ping }
+        return profiles
     }
 
     private fun cancelSmartConnect() {
@@ -608,6 +605,9 @@ class MainActivity : ThemedActivity(),
         ).apply {
             subscription = SubscriptionBean().apply {
                 link = normalizedUri
+                autoUpdate = true
+                autoUpdateDelay = SubscriptionUpdater.DEFAULT_AUTO_UPDATE_MINUTES
+                updateWhenConnectedOnly = false
             }
         }
 
@@ -1137,27 +1137,12 @@ class MainActivity : ThemedActivity(),
             now - lastSubscriptionAutoRefreshAt < SUBSCRIPTION_REFRESH_GUARD_MS) return
 
         subscriptionAutoRefreshJob = lifecycleScope.launchWhenStarted {
-            val subscriptions = withContext(Dispatchers.IO) {
-                SagerDatabase.groupDao.allGroups().filter { group ->
-                    group.type == GroupType.SUBSCRIPTION &&
-                            !group.subscription?.link.isNullOrBlank()
-                }
-            }
-            if (subscriptions.isEmpty()) {
-                subscriptionAutoRefreshJob = null
-                return@launchWhenStarted
-            }
-
             lastSubscriptionAutoRefreshAt = SystemClock.elapsedRealtime()
             try {
-                withContext(Dispatchers.IO) {
-                    subscriptions.forEach { group ->
-                        if (group.id !in GroupUpdater.updating) {
-                            GroupUpdater.executeUpdate(group, byUser = false)
-                        }
-                    }
+                val summary = withContext(Dispatchers.IO) {
+                    SubscriptionUpdater.refreshDueSubscriptions()
                 }
-                refreshSubscriptionCard()
+                if (summary.updated > 0) refreshSubscriptionCard()
             } finally {
                 subscriptionAutoRefreshJob = null
             }
@@ -1208,7 +1193,8 @@ class MainActivity : ThemedActivity(),
     companion object {
         private const val INITIAL_PERMISSION_REQUEST = 901
         private const val SUBSCRIPTION_ENTRY_HOLD_MS = 10_000L
-        private const val SUBSCRIPTION_REFRESH_GUARD_MS = 30_000L
+        private const val SUBSCRIPTION_REFRESH_GUARD_MS = 60_000L
+        private const val SMART_CONNECT_SUBSCRIPTION_WAIT_MS = 6_000L
     }
 
 }

@@ -246,8 +246,8 @@ public class SubscriptionBean extends Serializable {
         if (deduplication == null) deduplication = false;
         if (updateWhenConnectedOnly == null) updateWhenConnectedOnly = false;
         if (customUserAgent == null) customUserAgent = "";
-        if (autoUpdate == null) autoUpdate = false;
-        if (autoUpdateDelay == null) autoUpdateDelay = 1440;
+        if (autoUpdate == null) autoUpdate = true;
+        if (autoUpdateDelay == null) autoUpdateDelay = 60;
         if (lastUpdated == null) lastUpdated = 0L;
 
         if (bytesUsed == null) bytesUsed = 0L;

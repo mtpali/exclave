@@ -4,8 +4,10 @@
 -renamesourcefileattribute SourceFile
 -keepattributes Signature,*Annotation*,InnerClasses,EnclosingMethod
 
--keep class io.nekohasekai.sagernet.fmt.** { *; }
--keep class com.github.exclavenetwork.exclave.core.app.observatory.** { *; }
+# These models are reflected/serialized and must keep their external names and members. R8 may
+# still optimize their method bodies; the rest of the application remains shrinkable/obfuscatable.
+-keep,allowoptimization class io.nekohasekai.sagernet.fmt.** { *; }
+-keep,allowoptimization class com.github.exclavenetwork.exclave.core.app.observatory.** { *; }
 -keepclasseswithmembernames,includedescriptorclasses class * {
     native <methods>;
 }

@@ -99,7 +99,11 @@ class SagerNet : Application(),
             AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags("en-US"))
         }
 
-        System.setProperty(DEBUG_PROPERTY_NAME, DEBUG_PROPERTY_VALUE_ON)
+        if (BuildConfig.DEBUG) {
+            System.setProperty(DEBUG_PROPERTY_NAME, DEBUG_PROPERTY_VALUE_ON)
+        } else {
+            System.clearProperty(DEBUG_PROPERTY_NAME)
+        }
         Thread.setDefaultUncaughtExceptionHandler(CrashHandler)
         DataStore.init()
         updateNotificationChannels()
@@ -126,18 +130,17 @@ class SagerNet : Application(),
 
         if (isMainProcess) {
             MobileTinaExpiryManager.recoverPending(this)
+            runOnDefaultDispatcher {
+                runCatching {
+                    SubscriptionUpdater.initialize()
+                }.onFailure { Logs.w(it) }
+            }
         }
 
         if (!isMainProcess) {
             Libexclavecore.setUidDumper(this, Build.VERSION.SDK_INT < Build.VERSION_CODES.Q)
             if (DataStore.enableDebug && DataStore.pprofServer.isNotEmpty()) {
                 DebugInstance().launch()
-            }
-        }
-
-        if (!isMainProcess) runOnDefaultDispatcher {
-            runCatching {
-                SubscriptionUpdater.reconfigureUpdater()
             }
         }
 
@@ -340,7 +343,9 @@ class SagerNet : Application(),
 
             val linkAddresses = linkProperties.linkAddresses.toSet()
             if (DataStore.logLevel == LogLevel.DEBUG && currentLinkAddresses != linkAddresses) {
-                Log.d("Exclave", "updated link addresses: " + linkAddresses.joinToString(" ", "[", "]") { it.address.hostAddress!! + "/" + it.prefixLength })
+                if (BuildConfig.DEBUG) {
+                    Log.d("Exclave", "updated link addresses: " + linkAddresses.joinToString(" ", "[", "]") { it.address.hostAddress!! + "/" + it.prefixLength })
+                }
             }
             Libexclavecore.setDiscardIPv6(!linkAddresses.any { it.address is Inet6Address && !it.address.isLinkLocalAddress })
 
@@ -349,7 +354,9 @@ class SagerNet : Application(),
                 val linkAddressesChanged = currentLinkAddresses != null && !linkAddresses.containsAll(currentLinkAddresses!!)
                 if (networkChanged || linkAddressesChanged) {
                     if (DataStore.logLevel == LogLevel.DEBUG) {
-                        Log.d("Exclave", "network changed, interrupt reused connections")
+                        if (BuildConfig.DEBUG) {
+                            Log.d("Exclave", "network changed, interrupt reused connections")
+                        }
                     }
                     Libexclavecore.interfaceUpdate()
                 }

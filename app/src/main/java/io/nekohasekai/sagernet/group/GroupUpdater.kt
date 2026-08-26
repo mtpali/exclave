@@ -20,7 +20,6 @@
 package io.nekohasekai.sagernet.group
 
 import io.nekohasekai.sagernet.R
-import io.nekohasekai.sagernet.SagerNet
 import io.nekohasekai.sagernet.SubscriptionType
 import io.nekohasekai.sagernet.bg.MobileTinaExpiryManager
 import io.nekohasekai.sagernet.database.DataStore
@@ -62,21 +61,23 @@ abstract class GroupUpdater {
         suspend fun executeUpdate(proxyGroup: ProxyGroup, byUser: Boolean): Boolean {
             return coroutineScope {
                 if (MobileTinaExpiryManager.hasExpiryMarker()) return@coroutineScope false
-                if (!updating.add(proxyGroup.id)) cancel()
+                if (!updating.add(proxyGroup.id)) return@coroutineScope false
                 GroupManager.postReload(proxyGroup.id)
 
                 val subscription = proxyGroup.subscription!!
-                val connected = SagerNet.started && DataStore.startedProfile > 0
+                // The updater can run in WorkManager's main process while the VPN service runs
+                // in :bg. The persisted profile id is therefore the cross-process state.
+                val connected = DataStore.startedProfile > 0L
                 val userInterface = GroupManager.userInterface
 
                 if (subscription.updateWhenConnectedOnly && !connected) {
                     if (!byUser || userInterface == null) {
                         finishUpdate(proxyGroup)
-                        cancel()
+                        return@coroutineScope false
                     } else {
                         if (!userInterface.confirm(app.getString(R.string.update_subscription_warning))) {
                             finishUpdate(proxyGroup)
-                            cancel()
+                            return@coroutineScope false
                         }
                     }
                 }
@@ -89,6 +90,9 @@ abstract class GroupUpdater {
                         else -> error("unsupported")
                     }.doUpdate(proxyGroup, subscription, userInterface, byUser)
                     true
+                } catch (e: CancellationException) {
+                    finishUpdate(proxyGroup)
+                    throw e
                 } catch (e: Throwable) {
                     Logs.w(e)
                     if (byUser && userInterface != null) {

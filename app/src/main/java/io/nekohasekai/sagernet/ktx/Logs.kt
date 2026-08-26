@@ -20,6 +20,7 @@
 package io.nekohasekai.sagernet.ktx
 
 import android.util.Log
+import io.nekohasekai.sagernet.BuildConfig
 import java.io.InputStream
 import java.io.OutputStream
 
@@ -31,27 +32,19 @@ object Logs {
     }
 
     fun v(message: String) {
-        //  if (BuildConfig.DEBUG) {
-        Log.v(mkTag(), message)
-//        }
+        if (BuildConfig.DEBUG) Log.v(mkTag(), message)
     }
 
     fun v(message: String, exception: Throwable) {
-        //  if (BuildConfig.DEBUG) {
-        Log.v(mkTag(), message, exception)
-//        }
+        if (BuildConfig.DEBUG) Log.v(mkTag(), message, exception)
     }
 
     fun d(message: String) {
-        //  if (BuildConfig.DEBUG) {
-        Log.d(mkTag(), message)
-//        }
+        if (BuildConfig.DEBUG) Log.d(mkTag(), message)
     }
 
     fun d(message: String, exception: Throwable) {
-        //  if (BuildConfig.DEBUG) {
-        Log.d(mkTag(), message, exception)
-//        }
+        if (BuildConfig.DEBUG) Log.d(mkTag(), message, exception)
     }
 
     fun i(message: String) {
