@@ -616,7 +616,9 @@ class MainActivity : ThemedActivity(),
     private suspend fun finishImportSubscription(subscription: ProxyGroup) {
         val created = GroupManager.createGroup(subscription)
         DataStore.selectedGroup = created.id
-        GroupUpdater.executeUpdate(created, byUser = false)
+        // The first fetch is user initiated. Surface the real network/parser error instead
+        // of silently leaving an empty subscription group when the provider rejects it.
+        GroupUpdater.executeUpdate(created, byUser = true)
         onMainDispatcher {
             displayFragmentWithId(R.id.nav_configuration)
             setHomeMode(HomeMode.AUTO)

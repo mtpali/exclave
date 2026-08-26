@@ -187,7 +187,9 @@ fun String.toHysteriaPort(disallowFromGreaterThanTo: Boolean = false): Int {
     error("invalid port range")
 }
 
-const val USER_AGENT = "Exclave/${BuildConfig.VERSION_NAME}"
+// Subscription panels commonly choose the response format from this header.
+// Keep v2rayNG compatibility so they return a Base64/URI payload Exclave can parse.
+const val USER_AGENT = "v2rayNG/${BuildConfig.VERSION_NAME}"
 
 val PUBLIC_STUN_SERVERS = arrayOf(
     "stunserver2025.stunprotocol.org:3478",

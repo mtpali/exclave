@@ -71,8 +71,9 @@ object RawUpdater : GroupUpdater() {
             proxies = contentText?.let { parseRaw(contentText) }
                 ?: error(app.getString(R.string.no_proxies_found_in_subscription))
         } else {
-            val response = Libexclavecore.newHttpClient().apply {
-                if (SagerNet.started && DataStore.startedProfile > 0) {
+            val useRunningVpn = SagerNet.started && DataStore.startedProfile > 0
+            fun executeRequest(useVpnTunnel: Boolean) = Libexclavecore.newHttpClient().apply {
+                if (useVpnTunnel) {
                     useUDS(SagerNet.deviceStorage.noBackupFilesDir.toString() + "/ipc.sock")
                 }
             }.newRequest().apply {
@@ -90,6 +91,19 @@ object RawUpdater : GroupUpdater() {
                     }
                 }
             }.execute()
+
+            // Match MobileTinaVPN: prefer the running local VPN, but retry directly when
+            // its proxy socket is not ready or cannot reach the subscription provider.
+            val response = if (useRunningVpn) {
+                try {
+                    executeRequest(useVpnTunnel = true)
+                } catch (firstError: Throwable) {
+                    Logs.w(firstError)
+                    executeRequest(useVpnTunnel = false)
+                }
+            } else {
+                executeRequest(useVpnTunnel = false)
+            }
 
             rawPayload = response.contentString
             proxies = parseRaw(response.contentString)
