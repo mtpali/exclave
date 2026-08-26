@@ -525,6 +525,8 @@ class MainActivity : ThemedActivity(),
                 uri.getQueryParameter("url")?.let {
                     importSubscription(it)
                 }
+            } else if (uri.scheme.equals("v2rayng", ignoreCase = true)) {
+                importSubscription(uri.toString())
             } else {
                 importProfile(uri)
             }
