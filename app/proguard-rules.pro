@@ -11,6 +11,18 @@
 # still be renamed and repackaged, and R8 may optimize their method bodies.
 -keep,allowoptimization,allowobfuscation,allowrepackage class io.nekohasekai.sagernet.fmt.** { *; }
 -keep,allowoptimization,allowobfuscation,allowrepackage class com.github.exclavenetwork.exclave.core.app.observatory.** { *; }
+
+# V2RayConfig is converted to/from JSON by Gson and most fields intentionally do not carry
+# @SerializedName. Keep only those external JSON field names stable; the declaring class names and
+# packages remain fully obfuscated/repackaged by the rule above. Allowing these fields to be renamed
+# produces syntactically valid JSON with meaningless short keys and makes every release speed test
+# and connection fail even though debug builds continue to work.
+-keepclassmembers,allowshrinking,allowoptimization class io.nekohasekai.sagernet.fmt.v2ray.V2RayConfig {
+    <fields>;
+}
+-keepclassmembers,allowshrinking,allowoptimization class io.nekohasekai.sagernet.fmt.v2ray.V2RayConfig$* {
+    <fields>;
+}
 -keepclasseswithmembernames,includedescriptorclasses class * {
     native <methods>;
 }
