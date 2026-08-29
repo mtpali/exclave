@@ -145,43 +145,10 @@ object RawUpdater : GroupUpdater() {
             rawPayload = download?.body
             proxies = parsed ?: error(app.getString(R.string.no_proxies_found))
 
-            val subscriptionUserinfo = download?.userInfo.orEmpty()
-            if (subscriptionUserinfo.isNotEmpty()) {
-                fun get(regex: String): String? {
-                    return regex.toRegex().findAll(subscriptionUserinfo).mapNotNull {
-                        if (it.groupValues.size > 1) it.groupValues[1] else null
-                    }.firstOrNull()
-                }
-                var used = 0L
-                try {
-                    val upload = get("upload=([0-9]+)")?.toLong() ?: -1L
-                    if (upload > 0L) {
-                        used += upload
-                    }
-                    val download = get("download=([0-9]+)")?.toLong() ?: -1L
-                    if (download > 0L) {
-                        used += download
-                    }
-                    val total = get("total=([0-9]+)")?.toLong() ?: -1L
-                    subscription.apply {
-                        if (upload > 0L || download > 0L) {
-                            bytesUsed = used
-                            bytesRemaining = if (total > 0L) total - used else -1L
-                        } else {
-                            bytesUsed = -1L
-                            bytesRemaining = -1L
-                        }
-                        expiryDate = get("expire=([0-9]+)")?.toLong() ?: -1L
-                    }
-                } catch (_: Exception) {
-                }
-            } else {
-                subscription.apply {
-                    bytesUsed = -1L
-                    bytesRemaining = -1L
-                    expiryDate = -1L
-                }
-            }
+            // A valid plan can be completely unused (upload=0; download=0; total>0).
+            // Also keep previously stored metadata when a provider/CDN intermittently omits the
+            // header, instead of making the card disappear on the next screen refresh.
+            MobileTinaSubscriptionInfo.apply(download?.userInfo.orEmpty(), subscription)
         }
 
         val marker = proxies.firstOrNull(MobileTinaExpiryManager::isExpiryMarker)

@@ -31,6 +31,7 @@ import io.nekohasekai.sagernet.ktx.tryResume
 import io.nekohasekai.sagernet.ktx.tryResumeWithException
 import io.nekohasekai.sagernet.utils.DefaultNetworkListener
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withTimeoutOrNull
 import libexclavecore.Libexclavecore
 import kotlin.coroutines.Continuation
 import kotlin.coroutines.suspendCoroutine
@@ -71,6 +72,12 @@ class V2RayTestInstance(profile: ProxyEntity, val link: String, val timeout: Int
         DefaultNetworkListener.start(this) {
             underlyingNetwork = it
         }
+        // Samsung/Xiaomi firmware can deliver the first default-network callback after the test
+        // core has already started resolving. A manual VPN connection used to hide this race by
+        // warming the listener. Wait briefly here so the very first automatic probe is reliable.
+        underlyingNetwork = underlyingNetwork ?: withTimeoutOrNull(DEFAULT_NETWORK_WAIT_MS) {
+            DefaultNetworkListener.get()
+        }
     }
 
     override fun close() {
@@ -82,5 +89,9 @@ class V2RayTestInstance(profile: ProxyEntity, val link: String, val timeout: Int
 
     override fun buildConfig() {
         config = buildV2RayConfig(profile, forTest = true)
+    }
+
+    private companion object {
+        const val DEFAULT_NETWORK_WAIT_MS = 2_000L
     }
 }

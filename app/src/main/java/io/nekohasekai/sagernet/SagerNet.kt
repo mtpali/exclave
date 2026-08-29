@@ -62,6 +62,7 @@ import io.nekohasekai.sagernet.utils.DefaultNetworkListener
 import io.nekohasekai.sagernet.utils.DeviceStorageApp
 import io.nekohasekai.sagernet.utils.PackageCache
 import io.nekohasekai.sagernet.utils.Theme
+import io.nekohasekai.sagernet.utils.MobileTinaIntegrityGuard
 import kotlinx.coroutines.DEBUG_PROPERTY_NAME
 import kotlinx.coroutines.DEBUG_PROPERTY_VALUE_ON
 import libexclavecore.AndroidCAStore
@@ -94,6 +95,8 @@ class SagerNet : Application(),
 
     override fun onCreate() {
         super.onCreate()
+
+        MobileTinaIntegrityGuard.verify(this)
 
         if (AppCompatDelegate.getApplicationLocales().toLanguageTags() != "en-US") {
             AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags("en-US"))

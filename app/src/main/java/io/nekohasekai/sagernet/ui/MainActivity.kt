@@ -25,6 +25,7 @@ import android.content.Intent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.IntentFilter
+import android.app.Dialog
 import android.content.pm.PackageManager
 import android.content.res.ColorStateList
 import android.Manifest
@@ -84,11 +85,13 @@ import io.nekohasekai.sagernet.utils.PackageCache
 import io.nekohasekai.sagernet.utils.MobileTinaVault
 import io.nekohasekai.sagernet.utils.MobileTinaAssets
 import io.nekohasekai.sagernet.utils.MobileTinaImportNormalizer
+import io.nekohasekai.sagernet.utils.MobileTinaIntegrityGuard
 import io.nekohasekai.sagernet.utils.MobileTinaSmartConnect
 import io.noties.markwon.Markwon
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 
@@ -109,6 +112,7 @@ class MainActivity : ThemedActivity(),
     private var pingRefreshJob: Job? = null
     private var clearAllJob: Job? = null
     private var subscriptionAutoRefreshJob: Job? = null
+    private var subscriptionCardJob: Job? = null
     private var subscriptionNavRevealRunnable: Runnable? = null
     private var lastSubscriptionAutoRefreshAt = 0L
     private var smartConnectGeneration = 0L
@@ -118,6 +122,9 @@ class MainActivity : ThemedActivity(),
     private var expiryReceiverRegistered = false
     private var internetDialogVisible = false
     private var requestInitialVpnPermission = false
+    private var smartConnectPending = false
+    private var smartConnectStartRequested = false
+    private var firstLaunchDialog: Dialog? = null
 
     private val vpnPermissionOnly = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -140,6 +147,7 @@ class MainActivity : ThemedActivity(),
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        MobileTinaIntegrityGuard.verify(this)
 
         binding = LayoutMainBinding.inflate(layoutInflater)
         when (DataStore.fabStyle) {
@@ -245,15 +253,15 @@ class MainActivity : ThemedActivity(),
 
         runOnMainDispatcher {
             val welcomeKey = "mobileTinaWelcomeShownV7"
-            if (DataStore.configurationStore.getBoolean(welcomeKey) != true) {
-                DataStore.configurationStore.putBoolean(welcomeKey, true)
-                MaterialAlertDialogBuilder(this@MainActivity)
-                    .setTitle(R.string.mobiletina_app_title)
-                    .setMessage(MobileTinaVault.welcome())
-                    .setCancelable(false)
-                    .setPositiveButton(android.R.string.ok) { _, _ -> requestPermissions() }
-                    .show()
-            } else requestPermissions()
+            firstLaunchDialog = MobileTinaFirstLaunchDialog.showOnce(
+                activity = this@MainActivity,
+                preferences = DataStore.configurationStore,
+                key = welcomeKey,
+            ) {
+                firstLaunchDialog = null
+                if (!isFinishing && !isDestroyed) requestPermissions()
+            }
+            if (firstLaunchDialog == null) requestPermissions()
         }
     }
 
@@ -301,12 +309,13 @@ class MainActivity : ThemedActivity(),
             showExpiredState()
             return
         }
-        if (state.canStop || smartConnectJob?.isActive == true) {
-            cancelSmartConnect()
-            if (state.canStop) SagerNet.stopService()
+        if (state.canStop || smartConnectPending || smartConnectJob?.isActive == true) {
+            cancelSmartConnect(stopService = true)
             return
         }
         val generation = ++smartConnectGeneration
+        smartConnectPending = true
+        smartConnectStartRequested = false
         updateMobileTinaState(BaseService.State.Connecting)
         binding.tvAutoServer.setText(R.string.mobiletina_testing)
         smartConnectJob = lifecycleScope.launchWhenStarted {
@@ -336,6 +345,7 @@ class MainActivity : ThemedActivity(),
                 text = if (best.ping > 0) getString(R.string.mobiletina_ping_value, best.ping) else ""
             }
             smartConnectJob = null
+            smartConnectStartRequested = true
             connect.launch(null)
         }
     }
@@ -372,14 +382,29 @@ class MainActivity : ThemedActivity(),
         return profiles
     }
 
-    private fun cancelSmartConnect() {
+    private fun cancelSmartConnect(stopService: Boolean = false) {
         smartConnectGeneration++
         smartConnectJob?.cancel()
         smartConnectJob = null
+        val shouldStop = stopService && (state.canStop || smartConnectStartRequested)
+        smartConnectPending = false
+        smartConnectStartRequested = false
+        if (shouldStop) {
+            SagerNet.stopService()
+            lifecycleScope.launch {
+                // A few OEMs report/start the VPN service after the first stop broadcast. A
+                // bounded second stop closes that race without leaving an endless watchdog.
+                delay(SMART_CONNECT_STOP_RETRY_MS)
+                if (state.canStop) SagerNet.stopService()
+            }
+        }
+        if (stopService) updateMobileTinaState(BaseService.State.Stopped)
     }
 
     private fun markSmartConnectFailed(message: String) {
         smartConnectJob = null
+        smartConnectPending = false
+        smartConnectStartRequested = false
         updateMobileTinaState(BaseService.State.Stopped, failed = true)
         binding.tvAutoServer.text = message
         snackbar(message).show()
@@ -452,25 +477,28 @@ class MainActivity : ThemedActivity(),
     }
 
     private fun refreshSubscriptionCard() {
-        lifecycleScope.launchWhenStarted {
+        subscriptionCardJob?.cancel()
+        subscriptionCardJob = lifecycleScope.launch {
             if (MobileTinaExpiryManager.hasExpiryMarker()) {
                 binding.subscriptionCard.visibility = View.GONE
-                return@launchWhenStarted
+                return@launch
             }
+            val requestedGroupId = DataStore.currentGroupId()
             val group = withContext(Dispatchers.IO) {
-                SagerDatabase.groupDao.getById(DataStore.currentGroupId())
+                SagerDatabase.groupDao.getById(requestedGroupId)
             }
+            if (requestedGroupId != DataStore.currentGroupId()) return@launch
             val subscription = group?.subscription
             if (subscription == null) {
                 binding.subscriptionCard.visibility = View.GONE
-                return@launchWhenStarted
+                return@launch
             }
             val hasTraffic = subscription.bytesUsed >= 0L && subscription.bytesRemaining >= 0L &&
                     (subscription.bytesUsed > 0L || subscription.bytesRemaining > 0L)
             val hasExpiry = subscription.expiryDate > 0L
             if (!hasTraffic && !hasExpiry) {
                 binding.subscriptionCard.visibility = View.GONE
-                return@launchWhenStarted
+                return@launch
             }
             val used = subscription.bytesUsed.coerceAtLeast(0L)
             val remaining = subscription.bytesRemaining.coerceAtLeast(0L)
@@ -496,6 +524,7 @@ class MainActivity : ThemedActivity(),
                     ((used * 100L) / total).toInt().coerceIn(0, 100)
                 } else 0
             }
+            subscriptionCardJob = null
         }
     }
 
@@ -766,6 +795,7 @@ class MainActivity : ThemedActivity(),
             .commitAllowingStateLoss()
         supportFragmentManager.executePendingTransactions()
         (fragment as? ConfigurationFragment)?.setMobileTinaPresentation(home)
+        if (home && homeMode == HomeMode.AUTO) refreshSubscriptionCard()
         binding.drawerLayout.closeDrawers()
     }
 
@@ -819,6 +849,14 @@ class MainActivity : ThemedActivity(),
         binding.fab.changeState(state, this.state, animate)
         binding.stats.changeState(state)
         this.state = state
+        val smartAttemptFinished = state == BaseService.State.Connected ||
+                state == BaseService.State.Stopped && (msg != null || !smartConnectStartRequested) ||
+                state == BaseService.State.Idle &&
+                smartConnectJob?.isActive != true && !smartConnectStartRequested
+        if (smartAttemptFinished) {
+            smartConnectPending = false
+            smartConnectStartRequested = false
+        }
         updateMobileTinaState(state, failed = msg != null && state == BaseService.State.Stopped)
         if (msg != null) snackbar(msg).show()
 
@@ -1161,6 +1199,9 @@ class MainActivity : ThemedActivity(),
 
     override fun onDestroy() {
         cancelSmartConnect()
+        firstLaunchDialog?.dismiss()
+        firstLaunchDialog = null
+        subscriptionCardJob?.cancel()
         subscriptionAutoRefreshJob?.cancel()
         cancelSubscriptionNavReveal()
         super.onDestroy()
@@ -1195,6 +1236,7 @@ class MainActivity : ThemedActivity(),
         private const val SUBSCRIPTION_ENTRY_HOLD_MS = 10_000L
         private const val SUBSCRIPTION_REFRESH_GUARD_MS = 60_000L
         private const val SMART_CONNECT_SUBSCRIPTION_WAIT_MS = 6_000L
+        private const val SMART_CONNECT_STOP_RETRY_MS = 450L
     }
 
 }

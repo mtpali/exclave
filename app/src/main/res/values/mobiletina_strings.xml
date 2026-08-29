@@ -37,4 +37,5 @@
     <string name="mobiletina_cancel" translatable="false">بیخیال</string>
     <string name="mobiletina_enable_internet" translatable="false">لطفا اینترنت خود را روشن کنید</string>
     <string name="mobiletina_back_home" translatable="false">بازگشت به صفحه اصلی</string>
+    <string name="mobiletina_dialog_close" translatable="false">باشه</string>
 </resources>
