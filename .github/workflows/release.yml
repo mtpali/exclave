@@ -70,8 +70,22 @@ jobs:
         run: |
           echo "sdk.dir=${ANDROID_HOME}" > local.properties
           export LOCAL_PROPERTIES="${{ secrets.LOCAL_PROPERTIES }}"
-          ./gradlew :app:downloadAssets
-          ./gradlew :app:assembleOssRelease
+          mkdir -p "${HOME}/.android"
+          if [ ! -f "${HOME}/.android/debug.keystore" ]; then
+            keytool -genkeypair -v \
+              -keystore "${HOME}/.android/debug.keystore" \
+              -storepass android \
+              -alias androiddebugkey \
+              -keypass android \
+              -dname "CN=Android Debug,O=Android,C=US" \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 10000
+          fi
+          signer_sha="$(./gradlew -q :app:printMobileTinaReleaseCertificateSha256 | tail -n 1)"
+          test "${#signer_sha}" -eq 64
+          ./gradlew -PMOBILETINA_EXPECTED_SIGNER_SHA256="${signer_sha}" :app:downloadAssets
+          ./gradlew -PMOBILETINA_EXPECTED_SIGNER_SHA256="${signer_sha}" :app:assembleOssRelease
           mkdir -p artifacts
           universal_apk="$(find app/build/outputs/apk/oss/release -type f -name '*universal*.apk' ! -name '*unsigned*' -print -quit)"
           test -n "$universal_apk"

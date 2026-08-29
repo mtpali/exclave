@@ -24,8 +24,11 @@ import com.android.build.api.variant.FilterConfiguration
 import com.android.build.api.variant.impl.VariantOutputImpl
 import org.apache.tools.ant.filters.StringInputStream
 import org.gradle.api.JavaVersion
+import org.gradle.api.GradleException
 import org.gradle.api.Project
 import org.gradle.kotlin.dsl.getByType
+import java.security.KeyStore
+import java.security.MessageDigest
 import java.util.Properties
 import kotlin.io.encoding.Base64
 
@@ -133,6 +136,28 @@ fun Project.setupAppCommon(projectName: String = "") {
             isDebuggable = true
             isJniDebuggable = true
         }
+
+        tasks.register("printMobileTinaReleaseCertificateSha256") {
+            group = "verification"
+            description = "Prints the SHA-256 digest of the certificate used by the release build."
+            doLast {
+                val signing = buildTypes.getByName("release").signingConfig
+                    ?: throw GradleException("Release signing configuration is missing")
+                val store = signing.storeFile
+                    ?: throw GradleException("Release signing keystore is missing")
+                val storePassword = signing.storePassword
+                    ?: throw GradleException("Release signing store password is missing")
+                val keyAlias = signing.keyAlias
+                    ?: throw GradleException("Release signing alias is missing")
+                val keyStore = KeyStore.getInstance(KeyStore.getDefaultType()).apply {
+                    store.inputStream().use { load(it, storePassword.toCharArray()) }
+                }
+                val certificate = keyStore.getCertificate(keyAlias)
+                    ?: throw GradleException("Release signing certificate is missing")
+                val digest = MessageDigest.getInstance("SHA-256").digest(certificate.encoded)
+                println(digest.joinToString("") { "%02x".format(it.toInt() and 0xff) })
+            }
+        }
         dependenciesInfo.includeInApk = false
         dependenciesInfo.includeInBundle = false
         @Suppress("UnstableApiUsage")
@@ -183,6 +208,33 @@ fun Project.setupApp() {
     val pkgName = requireMetadata().getProperty("PACKAGE_NAME").trim()
     val verName = requireMetadata().getProperty("VERSION_NAME").trim()
     val verCode = requireMetadata().getProperty("VERSION_CODE").trim().toInt() * 5
+    val expectedSigner = (providers.gradleProperty("MOBILETINA_EXPECTED_SIGNER_SHA256").orNull
+        ?: System.getenv("MOBILETINA_EXPECTED_SIGNER_SHA256"))
+        ?.trim()
+        ?.lowercase()
+        .orEmpty()
+    val buildsRelease = gradle.startParameter.taskNames.any { task ->
+        val name = task.lowercase()
+        name.contains("release") && (name.contains("assemble") || name.contains("bundle"))
+    }
+    if (buildsRelease && !expectedSigner.matches(Regex("[0-9a-f]{64}"))) {
+        throw GradleException(
+            "MOBILETINA_EXPECTED_SIGNER_SHA256 must contain the release certificate SHA-256"
+        )
+    }
+    val signerMask = intArrayOf(
+        33, 197, 143, 183, 9, 250, 151, 1,
+        250, 140, 242, 89, 207, 138, 195, 173,
+        218, 240, 200, 252, 157, 40, 122, 81,
+        229, 169, 26, 42, 1, 168, 35, 177,
+    )
+    val signerToken = if (expectedSigner.matches(Regex("[0-9a-f]{64}"))) {
+        expectedSigner.chunked(2).mapIndexed { index, hex ->
+            hex.toInt(16) xor signerMask[index]
+        }.joinToString("") { "%02x".format(it and 0xff) }
+    } else {
+        ""
+    }
     setupAppCommon()
     androidApp.apply {
         defaultConfig.applicationId = pkgName
@@ -194,10 +246,18 @@ fun Project.setupApp() {
         buildTypes.getByName("release") {
             isMinifyEnabled = true
             isShrinkResources = true
+            buildConfigField(
+                "String",
+                "MOBILETINA_SIGNER_TOKEN",
+                "\"$signerToken\""
+            )
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 file("proguard-rules.pro")
             )
+        }
+        buildTypes.getByName("debug") {
+            buildConfigField("String", "MOBILETINA_SIGNER_TOKEN", "\"\"")
         }
         buildFeatures.aidl = true
         buildFeatures.buildConfig = true

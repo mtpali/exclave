@@ -97,6 +97,7 @@ class SagerNet : Application(),
         super.onCreate()
 
         MobileTinaIntegrityGuard.verify(this)
+        MobileTinaIntegrityGuard.installContinuousVerification(this)
 
         if (AppCompatDelegate.getApplicationLocales().toLanguageTags() != "en-US") {
             AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags("en-US"))
@@ -369,9 +370,11 @@ class SagerNet : Application(),
             currentLinkAddresses = linkAddresses
         }
 
-        fun startService() = ContextCompat.startForegroundService(
-            application, Intent(application, SagerConnection.serviceClass)
-        )
+        fun startService() = MobileTinaIntegrityGuard.verify(application).let {
+            ContextCompat.startForegroundService(
+                application, Intent(application, SagerConnection.serviceClass)
+            )
+        }
 
         fun reloadService() =
             application.sendBroadcast(Intent(Action.RELOAD).setPackage(application.packageName))
