@@ -190,7 +190,7 @@ object MobileTinaIntegrityGuard {
         }
     }
 
-    private fun fail(): Nothing = throw SecurityException("MobileTina integrity check failed")
+    private fun fail(): Nothing = throw SecurityException()
 
     private object PackageInfoCompat {
         fun longVersionCode(packageInfo: PackageInfo): Long =
