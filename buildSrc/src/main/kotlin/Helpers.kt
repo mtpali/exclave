@@ -106,14 +106,26 @@ fun Project.setupAppCommon(projectName: String = "") {
     val keystorePwd = lp.getProperty("KEYSTORE_PASS") ?: System.getenv("KEYSTORE_PASS")
     val alias = lp.getProperty("ALIAS_NAME") ?: System.getenv("ALIAS_NAME")
     val pwd = lp.getProperty("ALIAS_PASS") ?: System.getenv("ALIAS_PASS")
+    val releaseKeyStore = rootProject.file("release.keystore")
+    val releaseSigningValues = listOf(keystorePwd, alias, pwd)
+    val hasReleaseSigningConfig = releaseKeyStore.isFile &&
+        releaseSigningValues.all { !it.isNullOrBlank() }
+    val hasPartialReleaseSigningConfig = releaseKeyStore.exists() ||
+        releaseSigningValues.any { !it.isNullOrBlank() }
+
+    if (hasPartialReleaseSigningConfig && !hasReleaseSigningConfig) {
+        throw GradleException(
+            "Production signing requires release.keystore, KEYSTORE_PASS, ALIAS_NAME, and ALIAS_PASS"
+        )
+    }
 
     androidApp.apply {
-        if (keystorePwd != null) {
+        if (hasReleaseSigningConfig) {
             signingConfigs.create("release") {
-                storeFile = rootProject.file("release.keystore")
-                storePassword = keystorePwd
-                keyAlias = alias
-                keyPassword = pwd
+                storeFile = releaseKeyStore
+                storePassword = keystorePwd!!
+                keyAlias = alias!!
+                keyPassword = pwd!!
                 enableV3Signing = true
             }
         }

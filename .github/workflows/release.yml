@@ -66,10 +66,21 @@ jobs:
         with:
           path: ~/.gradle
           key: gradle-${{ hashFiles('**/*.gradle.kts') }}
+      - name: Prepare Signing Material
+        env:
+          RELEASE_KEYSTORE_BASE64: ${{ secrets.MOBILETINA_RELEASE_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$RELEASE_KEYSTORE_BASE64" ]; then
+            umask 077
+            printf '%s' "$RELEASE_KEYSTORE_BASE64" | base64 --decode > release.keystore
+          fi
       - name: Gradle Build
+        env:
+          LOCAL_PROPERTIES: ${{ secrets.LOCAL_PROPERTIES }}
+          PRODUCTION_SIGNER_SHA256: ${{ secrets.MOBILETINA_PRODUCTION_SIGNER_SHA256 }}
+          RELEASE_REQUESTED: ${{ github.event.inputs.release }}
         run: |
           echo "sdk.dir=${ANDROID_HOME}" > local.properties
-          export LOCAL_PROPERTIES="${{ secrets.LOCAL_PROPERTIES }}"
           mkdir -p "${HOME}/.android"
           if [ ! -f "${HOME}/.android/debug.keystore" ]; then
             keytool -genkeypair -v \
@@ -83,7 +94,24 @@ jobs:
               -validity 10000
           fi
           signer_sha="$(./gradlew -q :app:printMobileTinaReleaseCertificateSha256 | tail -n 1)"
-          test "${#signer_sha}" -eq 64
+          if ! [[ "$signer_sha" =~ ^[0-9a-f]{64}$ ]]; then
+            echo "Release signer fingerprint is invalid" >&2
+            exit 1
+          fi
+          if [ -f release.keystore ]; then
+            normalized_production_signer="${PRODUCTION_SIGNER_SHA256,,}"
+            if ! [[ "$normalized_production_signer" =~ ^[0-9a-f]{64}$ ]]; then
+              echo "MOBILETINA_PRODUCTION_SIGNER_SHA256 is required for production signing" >&2
+              exit 1
+            fi
+            if [ "$signer_sha" != "$normalized_production_signer" ]; then
+              echo "Production signing certificate does not match the pinned fingerprint" >&2
+              exit 1
+            fi
+          elif [ "$RELEASE_REQUESTED" = "y" ]; then
+            echo "Publishing requires the production keystore; refusing debug-signed release" >&2
+            exit 1
+          fi
           ./gradlew -PMOBILETINA_EXPECTED_SIGNER_SHA256="${signer_sha}" :app:downloadAssets
           ./gradlew -PMOBILETINA_EXPECTED_SIGNER_SHA256="${signer_sha}" :app:assembleOssRelease
           mkdir -p artifacts
@@ -93,6 +121,9 @@ jobs:
           apksigner="${ANDROID_HOME}/build-tools/37.0.0/apksigner"
           test -x "$apksigner"
           "$apksigner" verify --verbose --print-certs artifacts/MobileTina-ARMv7-ARMv8-universal.apk
+      - name: Remove Signing Material
+        if: always()
+        run: rm -f release.keystore
       - name: Upload Artifacts
         uses: actions/upload-artifact@v7
         with:
@@ -105,6 +136,7 @@ jobs:
     needs: build
     env:
       GH_TOKEN: ${{ github.token }}
+      RELEASE_TAG: ${{ github.event.inputs.tag }}
     permissions:
       contents: write
     steps:
@@ -118,8 +150,8 @@ jobs:
       - name: Publish Pre-release
         if: github.event.inputs.prerelease == 'y'
         run: |
-          gh release create ${{ github.event.inputs.tag }} --notes="" --title=${{ github.event.inputs.tag }} --prerelease artifacts/MobileTina-ARMv7-ARMv8-universal.apk
+          gh release create "$RELEASE_TAG" --notes="" --title="$RELEASE_TAG" --prerelease artifacts/MobileTina-ARMv7-ARMv8-universal.apk
       - name: Publish Release
         if: github.event.inputs.prerelease != 'y'
         run: |
-          gh release create ${{ github.event.inputs.tag }} --notes="" --title=${{ github.event.inputs.tag }} artifacts/MobileTina-ARMv7-ARMv8-universal.apk
+          gh release create "$RELEASE_TAG" --notes="" --title="$RELEASE_TAG" artifacts/MobileTina-ARMv7-ARMv8-universal.apk
