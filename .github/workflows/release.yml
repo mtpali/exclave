@@ -126,8 +126,9 @@ jobs:
             unzip -p artifacts/MobileTina-ARMv7-ARMv8-universal.apk \
               "lib/${abi}/libv.so" > "${native_check_dir}/libv-${abi}.so"
             test -s "${native_check_dir}/libv-${abi}.so"
-            if readelf -S "${native_check_dir}/libv-${abi}.so" | grep -Eq '\.debug_|\.symtab'; then
-              echo "Native integrity guard contains debug symbols for ${abi}" >&2
+            if readelf -S "${native_check_dir}/libv-${abi}.so" | \
+                grep -Eq '\.debug_|\.symtab|\.note\.gnu\.build-id'; then
+              echo "Native integrity guard exposes build metadata for ${abi}" >&2
               exit 1
             fi
           done

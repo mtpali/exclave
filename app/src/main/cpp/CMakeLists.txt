@@ -33,5 +33,6 @@ target_compile_options(v PRIVATE
 target_link_options(v PRIVATE
     -Wl,--gc-sections
     -Wl,--strip-all
+    -Wl,--build-id=none
     -Wl,-z,max-page-size=16384
 )
