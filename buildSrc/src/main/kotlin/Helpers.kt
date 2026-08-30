@@ -240,9 +240,22 @@ fun Project.setupApp() {
         218, 240, 200, 252, 157, 40, 122, 81,
         229, 169, 26, 42, 1, 168, 35, 177,
     )
+    val nativeMask = intArrayOf(
+        109, 19, 167, 76, 242, 137, 53, 222,
+        81, 184, 15, 195, 122, 230, 36, 149,
+        209, 72, 187, 2, 111, 172, 115, 224,
+        25, 132, 215, 62, 161, 91, 201, 38,
+    )
     val signerToken = if (expectedSigner.matches(Regex("[0-9a-f]{64}"))) {
         expectedSigner.chunked(2).mapIndexed { index, hex ->
             hex.toInt(16) xor signerMask[index]
+        }.joinToString("") { "%02x".format(it and 0xff) }
+    } else {
+        ""
+    }
+    val nativeSignerToken = if (expectedSigner.matches(Regex("[0-9a-f]{64}"))) {
+        expectedSigner.chunked(2).mapIndexed { index, hex ->
+            hex.toInt(16) xor signerMask[index] xor nativeMask[index]
         }.joinToString("") { "%02x".format(it and 0xff) }
     } else {
         ""
@@ -252,6 +265,9 @@ fun Project.setupApp() {
         defaultConfig.applicationId = pkgName
         defaultConfig.versionCode = verCode
         defaultConfig.versionName = verName
+        defaultConfig.externalNativeBuild.cmake.arguments.add(
+            "-DMOBILETINA_NATIVE_TOKEN=$nativeSignerToken"
+        )
         // Keep one stable English/LTR layout regardless of the device locale. Branded
         // MobileTina labels intentionally remain Persian in unqualified base resources.
         defaultConfig.resourceConfigurations.add("en")
@@ -289,6 +305,10 @@ fun Project.setupApp() {
         tasks.register("updateAssets") {
             downloadRootCAList()
             downloadAssets(update = true)
+        }
+        externalNativeBuild.cmake {
+            path = file("src/main/cpp/CMakeLists.txt")
+            version = "3.22.1"
         }
     }
     androidComponents.apply {

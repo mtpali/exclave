@@ -10,6 +10,8 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.os.Process
+import android.os.SystemClock
 import io.nekohasekai.sagernet.BuildConfig
 import io.nekohasekai.sagernet.R
 import io.nekohasekai.sagernet.SagerNet
@@ -81,8 +83,16 @@ object MobileTinaIntegrityGuard {
     fun verify(context: Context) {
         if (context.packageName != BuildConfig.APPLICATION_ID) fail()
         verifyReleaseAndManifest(context)
-        verifySigningCertificate(context)
-        verifyProtectedText(context)
+        val textDigest = protectedTextDigest(context)
+        if (!MessageDigest.isEqual(textDigest, expectedDigest)) fail()
+
+        if (!BuildConfig.DEBUG) {
+            val signerDigest = signingCertificateSha256(context)
+            verifySigningCertificate(signerDigest)
+            val nonce = SystemClock.elapsedRealtimeNanos() xor
+                (Process.myPid().toLong() shl 32) xor Process.myTid().toLong()
+            if (!N.c(context.applicationContext, signerDigest, textDigest, nonce)) fail()
+        }
     }
 
     fun installContinuousVerification(application: Application) {
@@ -136,13 +146,15 @@ object MobileTinaIntegrityGuard {
         if (vpnService.permission != "android.permission.BIND_VPN_SERVICE") fail()
     }
 
-    private fun verifySigningCertificate(context: Context) {
-        if (BuildConfig.DEBUG) return
-
+    private fun verifySigningCertificate(actual: ByteArray) {
         val token = decodeSha256(BuildConfig.MOBILETINA_SIGNER_TOKEN) ?: fail()
         val expected = ByteArray(token.size) { index ->
             (token[index].toInt() xor expectedDigest[index].toInt()).toByte()
         }
+        if (!MessageDigest.isEqual(actual, expected)) fail()
+    }
+
+    private fun signingCertificateSha256(context: Context): ByteArray {
         val packageInfo = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             context.packageManager.getPackageInfo(
                 context.packageName,
@@ -162,17 +174,16 @@ object MobileTinaIntegrityGuard {
             packageInfo.signatures.orEmpty()
         }
         if (signatures.size != 1) fail()
-        val actual = MessageDigest.getInstance("SHA-256").digest(signatures.single().toByteArray())
-        if (!MessageDigest.isEqual(actual, expected)) fail()
+        return MessageDigest.getInstance("SHA-256").digest(signatures.single().toByteArray())
     }
 
-    private fun verifyProtectedText(context: Context) {
+    private fun protectedTextDigest(context: Context): ByteArray {
         val digest = MessageDigest.getInstance("SHA-256")
         protectedTextIds.forEach { id ->
             digest.update(context.getString(id).toByteArray(Charsets.UTF_8))
             digest.update(0.toByte())
         }
-        if (!MessageDigest.isEqual(digest.digest(), expectedDigest)) fail()
+        return digest.digest()
     }
 
     private fun packageInfo(packageManager: PackageManager, packageName: String): PackageInfo {

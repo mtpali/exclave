@@ -121,6 +121,22 @@ jobs:
           apksigner="${ANDROID_HOME}/build-tools/37.0.0/apksigner"
           test -x "$apksigner"
           "$apksigner" verify --verbose --print-certs artifacts/MobileTina-ARMv7-ARMv8-universal.apk
+          native_check_dir="$(mktemp -d)"
+          for abi in armeabi-v7a arm64-v8a; do
+            unzip -p artifacts/MobileTina-ARMv7-ARMv8-universal.apk \
+              "lib/${abi}/libv.so" > "${native_check_dir}/libv-${abi}.so"
+            test -s "${native_check_dir}/libv-${abi}.so"
+            if readelf -S "${native_check_dir}/libv-${abi}.so" | grep -Eq '\.debug_|\.symtab'; then
+              echo "Native integrity guard contains debug symbols for ${abi}" >&2
+              exit 1
+            fi
+          done
+          if unzip -p artifacts/MobileTina-ARMv7-ARMv8-universal.apk classes.dex classes2.dex | \
+              grep -aFq "$signer_sha"; then
+            echo "Raw signer fingerprint leaked into DEX" >&2
+            exit 1
+          fi
+          rm -rf "$native_check_dir"
       - name: Remove Signing Material
         if: always()
         run: rm -f release.keystore

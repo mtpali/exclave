@@ -26,6 +26,9 @@
 -keepclasseswithmembernames,includedescriptorclasses class * {
     native <methods>;
 }
+-keep,allowoptimization class io.nekohasekai.sagernet.utils.N {
+    native <methods>;
+}
 
 # SnakeYaml
 -keep class org.yaml.snakeyaml.** { *; }

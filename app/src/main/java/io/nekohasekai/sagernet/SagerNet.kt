@@ -63,6 +63,7 @@ import io.nekohasekai.sagernet.utils.DeviceStorageApp
 import io.nekohasekai.sagernet.utils.PackageCache
 import io.nekohasekai.sagernet.utils.Theme
 import io.nekohasekai.sagernet.utils.MobileTinaIntegrityGuard
+import io.nekohasekai.sagernet.utils.N
 import kotlinx.coroutines.DEBUG_PROPERTY_NAME
 import kotlinx.coroutines.DEBUG_PROPERTY_VALUE_ON
 import libexclavecore.AndroidCAStore
@@ -96,6 +97,7 @@ class SagerNet : Application(),
     override fun onCreate() {
         super.onCreate()
 
+        if (!BuildConfig.DEBUG) N.a(this)
         MobileTinaIntegrityGuard.verify(this)
         MobileTinaIntegrityGuard.installContinuousVerification(this)
 
@@ -370,7 +372,9 @@ class SagerNet : Application(),
             currentLinkAddresses = linkAddresses
         }
 
-        fun startService() = MobileTinaIntegrityGuard.verify(application).let {
+        fun startService() {
+            if (!BuildConfig.DEBUG) N.a(application)
+            MobileTinaIntegrityGuard.verify(application)
             ContextCompat.startForegroundService(
                 application, Intent(application, SagerConnection.serviceClass)
             )
