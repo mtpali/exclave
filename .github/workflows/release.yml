@@ -93,7 +93,14 @@ jobs:
               -keysize 2048 \
               -validity 10000
           fi
-          signer_sha="$(./gradlew -q :app:printMobileTinaReleaseCertificateSha256 | tail -n 1)"
+          if [ -f release.keystore ]; then
+            signer_sha="${PRODUCTION_SIGNER_SHA256,,}"
+          else
+            signer_sha="$(keytool -exportcert \
+              -keystore "${HOME}/.android/debug.keystore" \
+              -storepass android \
+              -alias androiddebugkey | sha256sum | cut -d ' ' -f 1)"
+          fi
           if ! [[ "$signer_sha" =~ ^[0-9a-f]{64}$ ]]; then
             echo "Release signer fingerprint is invalid" >&2
             exit 1
@@ -102,10 +109,6 @@ jobs:
             normalized_production_signer="${PRODUCTION_SIGNER_SHA256,,}"
             if ! [[ "$normalized_production_signer" =~ ^[0-9a-f]{64}$ ]]; then
               echo "MOBILETINA_PRODUCTION_SIGNER_SHA256 is required for production signing" >&2
-              exit 1
-            fi
-            if [ "$signer_sha" != "$normalized_production_signer" ]; then
-              echo "Production signing certificate does not match the pinned fingerprint" >&2
               exit 1
             fi
           elif [ "$RELEASE_REQUESTED" = "y" ]; then
@@ -120,7 +123,15 @@ jobs:
           cp "$universal_apk" artifacts/MobileTina-ARMv7-ARMv8-universal.apk
           apksigner="${ANDROID_HOME}/build-tools/37.0.0/apksigner"
           test -x "$apksigner"
-          "$apksigner" verify --verbose --print-certs artifacts/MobileTina-ARMv7-ARMv8-universal.apk
+          verification_output="$("$apksigner" verify --verbose --print-certs \
+            artifacts/MobileTina-ARMv7-ARMv8-universal.apk)"
+          printf '%s\n' "$verification_output"
+          apk_signer_sha="$(printf '%s\n' "$verification_output" | \
+            sed -n 's/^Signer #1 certificate SHA-256 digest: //p' | head -n 1)"
+          if [ "$apk_signer_sha" != "$signer_sha" ]; then
+            echo "APK signing certificate does not match the expected fingerprint" >&2
+            exit 1
+          fi
           native_check_dir="$(mktemp -d)"
           for abi in armeabi-v7a arm64-v8a; do
             unzip -p artifacts/MobileTina-ARMv7-ARMv8-universal.apk \
