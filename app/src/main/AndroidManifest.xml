@@ -142,6 +142,7 @@
                 <data android:scheme="tuic" />
                 <data android:scheme="wireguard" />
                 <data android:scheme="wg" />
+                <data android:scheme="amneziawg" />
                 <data android:scheme="mierus" />
                 <data android:scheme="quic" />
                 <data android:scheme="anytls" />
@@ -161,6 +162,16 @@
                 <data android:host="install-sub" />
             </intent-filter>
 
+            <intent-filter android:label="@string/profile_import">
+                <action android:name="android.intent.action.VIEW" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+
+                <data
+                    android:host="awg"
+                    android:scheme="sn" />
+            </intent-filter>
         </activity>
         <activity
             android:name="io.nekohasekai.sagernet.ui.VpnRequestActivity"

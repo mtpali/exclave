@@ -1299,7 +1299,39 @@ fun buildV2RayConfig(
                                                 keepAlive = bean.keepaliveInterval
                                             }
                                             endpoint = joinHostPort(bean.serverAddress, bean.serverPort)
+                                            if (bean.isAmneziaWG) {
+                                                allowedIPs = bean.allowedIPs.listByLineOrComma()
+                                            }
                                         })
+                                        if (bean.isAmneziaWG) {
+                                            amnezia = WireGuardOutboundConfigurationObject.AmneziaWGOptionsObject().apply {
+                                                jc = bean.awgJc
+                                                jmin = bean.awgJmin
+                                                jmax = bean.awgJmax
+                                                s1 = bean.awgS1
+                                                s2 = bean.awgS2
+                                                s3 = bean.awgS3
+                                                s4 = bean.awgS4
+                                                h1 = bean.awgH1
+                                                h2 = bean.awgH2
+                                                h3 = bean.awgH3
+                                                h4 = bean.awgH4
+                                                i1 = bean.awgI1
+                                                i2 = bean.awgI2
+                                                i3 = bean.awgI3
+                                                i4 = bean.awgI4
+                                                i5 = bean.awgI5
+                                                headerProtectionKey = bean.awgHeaderProtectionKey
+                                                contentPaddingAddition = bean.awgContentPaddingAddition
+                                                rekeyAfterTime = bean.awgRekeyAfterTime
+                                                rekeyTimeout = bean.awgRekeyTimeout
+                                                rejectAfterTime = bean.awgRejectAfterTime
+                                                keepaliveTimeout = bean.awgKeepaliveTimeout
+                                                maxHandshakeAttempts = bean.awgMaxHandshakeAttempts
+                                                randomizePacketTrailers = bean.awgRandomizePacketTrailers
+                                                disableCookieReplies = bean.awgDisableCookieReplies
+                                            }
+                                        }
                                     })
                                 if (currentDomainStrategy == "AsIs") {
                                     currentDomainStrategy = "UseIP"

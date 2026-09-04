@@ -910,6 +910,37 @@ public class V2RayConfig {
         public List<WireGuardPeerObject> peers;
         public List<Integer> reserved;
         public String domainStrategy;
+        public AmneziaWGOptionsObject amnezia;
+
+        public static class AmneziaWGOptionsObject {
+
+            public Integer jc;
+            public Integer jmin;
+            public Integer jmax;
+            public Integer s1;
+            public Integer s2;
+            public Integer s3;
+            public Integer s4;
+            public String h1;
+            public String h2;
+            public String h3;
+            public String h4;
+            public String i1;
+            public String i2;
+            public String i3;
+            public String i4;
+            public String i5;
+            public String headerProtectionKey;
+            public String contentPaddingAddition;
+            public String rekeyAfterTime;
+            public String rekeyTimeout;
+            public String rejectAfterTime;
+            public String keepaliveTimeout;
+            public String maxHandshakeAttempts;
+            public Boolean randomizePacketTrailers;
+            public Boolean disableCookieReplies;
+
+        }
 
         public static class WireGuardPeerObject {
 

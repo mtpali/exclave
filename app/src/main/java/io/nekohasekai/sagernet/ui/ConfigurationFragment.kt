@@ -535,6 +535,11 @@ class ConfigurationFragment @JvmOverloads constructor(
             R.id.action_new_wg -> {
                 startActivity(Intent(requireActivity(), WireGuardSettingsActivity::class.java))
             }
+            R.id.action_new_amneziawg -> {
+                startActivity(Intent(requireActivity(), WireGuardSettingsActivity::class.java).apply {
+                    putExtra(WireGuardSettingsActivity.EXTRA_AMNEZIAWG, true)
+                })
+            }
             R.id.action_new_juicity -> {
                 startActivity(Intent(requireActivity(), JuicitySettingsActivity::class.java))
             }

@@ -37,6 +37,8 @@ import io.nekohasekai.sagernet.fmt.trusttunnel.parseTrustTunnel
 import io.nekohasekai.sagernet.fmt.tuic5.parseTuic
 import io.nekohasekai.sagernet.fmt.v2ray.parseV2Ray
 import io.nekohasekai.sagernet.fmt.wireguard.parseWireGuard
+import io.nekohasekai.sagernet.fmt.wireguard.parseAmneziaWG
+import io.nekohasekai.sagernet.fmt.wireguard.parseNekoBoxAmneziaBackup
 import kotlin.io.encoding.Base64
 
 fun String.decodeBase64(): String {
@@ -110,6 +112,14 @@ fun parseShareLinks(text: String): List<AbstractBean> {
             runCatching {
                 entities.add(parseWireGuard(this))
             }
+        } else if (startsWith("amneziawg://", ignoreCase = true)) {
+            runCatching {
+                entities.addAll(parseAmneziaWG(this))
+            }
+        } else if (startsWith("sn://awg?", ignoreCase = true)) {
+            runCatching {
+                entities.add(parseNekoBoxAmneziaBackup(this))
+            }
         } else if (startsWith("mierus://", ignoreCase = true)) {
             runCatching {
                 entities.addAll(parseMieru(this))
@@ -148,7 +158,11 @@ fun parseBackupLines(text: String): List<AbstractBean> {
     val entities = ArrayList<AbstractBean>()
     for (line in lines) {
         try {
-            entities.add(parseBackup(line))
+            if (line.startsWith("sn://awg?", ignoreCase = true)) {
+                entities.add(parseNekoBoxAmneziaBackup(line))
+            } else {
+                entities.add(parseBackup(line))
+            }
         } catch (_: Exception) {
             return listOf()
         }

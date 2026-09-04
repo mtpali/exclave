@@ -1810,6 +1810,34 @@ fun parseV2RayOutbound(outbound: JsonObject): List<AbstractBean> {
                         wireguardBean.reserved = listOf(it[0].toString(), it[1].toString(), it[2].toString()).joinToString(",")
                     }
                 }
+                settings.getObject("amnezia")?.also { amnezia ->
+                    wireguardBean.isAmneziaWG = true
+                    wireguardBean.awgJc = amnezia.getInt("jc") ?: 0
+                    wireguardBean.awgJmin = amnezia.getInt("jmin") ?: 0
+                    wireguardBean.awgJmax = amnezia.getInt("jmax") ?: 0
+                    wireguardBean.awgS1 = amnezia.getInt("s1") ?: 0
+                    wireguardBean.awgS2 = amnezia.getInt("s2") ?: 0
+                    wireguardBean.awgS3 = amnezia.getInt("s3") ?: 0
+                    wireguardBean.awgS4 = amnezia.getInt("s4") ?: 0
+                    wireguardBean.awgH1 = amnezia.getString("h1").orEmpty()
+                    wireguardBean.awgH2 = amnezia.getString("h2").orEmpty()
+                    wireguardBean.awgH3 = amnezia.getString("h3").orEmpty()
+                    wireguardBean.awgH4 = amnezia.getString("h4").orEmpty()
+                    wireguardBean.awgI1 = amnezia.getString("i1").orEmpty()
+                    wireguardBean.awgI2 = amnezia.getString("i2").orEmpty()
+                    wireguardBean.awgI3 = amnezia.getString("i3").orEmpty()
+                    wireguardBean.awgI4 = amnezia.getString("i4").orEmpty()
+                    wireguardBean.awgI5 = amnezia.getString("i5").orEmpty()
+                    wireguardBean.awgHeaderProtectionKey = amnezia.getString("headerProtectionKey").orEmpty()
+                    wireguardBean.awgContentPaddingAddition = amnezia.getString("contentPaddingAddition").orEmpty()
+                    wireguardBean.awgRekeyAfterTime = amnezia.getString("rekeyAfterTime").orEmpty()
+                    wireguardBean.awgRekeyTimeout = amnezia.getString("rekeyTimeout").orEmpty()
+                    wireguardBean.awgRejectAfterTime = amnezia.getString("rejectAfterTime").orEmpty()
+                    wireguardBean.awgKeepaliveTimeout = amnezia.getString("keepaliveTimeout").orEmpty()
+                    wireguardBean.awgMaxHandshakeAttempts = amnezia.getString("maxHandshakeAttempts").orEmpty()
+                    wireguardBean.awgRandomizePacketTrailers = amnezia.getBoolean("randomizePacketTrailers") == true
+                    wireguardBean.awgDisableCookieReplies = amnezia.getBoolean("disableCookieReplies") == true
+                }
                 settings.getArray("peers")?.forEach { peer ->
                     beanList.add(wireguardBean.applyDefaultValues().clone().apply {
                         peer.getString("endpoint")?.also { endpoint ->
@@ -1839,6 +1867,9 @@ fun parseV2RayOutbound(outbound: JsonObject): List<AbstractBean> {
                         }
                         peer.getInt("keepAlive")?.takeIf { it > 0 }?.also {
                             keepaliveInterval = it
+                        }
+                        peer.getStringArray("allowedIPs")?.also {
+                            allowedIPs = it.joinToString("\n")
                         }
                     })
                 }
