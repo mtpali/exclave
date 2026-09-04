@@ -518,7 +518,7 @@ data class ProxyEntity(
         ).apply {
             putExtra(ProfileSettingsActivity.EXTRA_PROFILE_ID, id)
             putExtra(ProfileSettingsActivity.EXTRA_IS_SUBSCRIPTION, isSubscription)
-            if (type == TYPE_WG && wgBean?.isAmneziaWG == true) {
+            if (this@ProxyEntity.type == TYPE_WG && wgBean?.isAmneziaWG == true) {
                 putExtra(WireGuardSettingsActivity.EXTRA_AMNEZIAWG, true)
             }
         }
