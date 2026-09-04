@@ -3,6 +3,7 @@
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CGO_LDFLAGS="-Wl,-z,max-page-size=16384" bash "$script_dir/with_amnezia_core.sh" \
   gomobile bind -v -androidapi 21 -tags="with_clash" \
+  -o "$script_dir/libexclavecore.aar" \
   "github.com/exclavenetwork/libexclavecore" || exit 1
 
 proj=../../app/libs

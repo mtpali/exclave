@@ -12,7 +12,7 @@ core_module="github.com/exclavenetwork/exclave-core/v5"
 core_patch="$script_dir/patches/exclave-core-amneziawg.patch"
 task_build_dir="$(mktemp -d)"
 patched_core="$task_build_dir/exclave-core"
-work_file="$task_build_dir/go.work"
+wrapper_module="$task_build_dir/wrapper"
 
 cleanup() {
     chmod -R u+w "$task_build_dir" 2>/dev/null || true
@@ -33,5 +33,10 @@ cp -a "$core_source/." "$patched_core/"
 chmod -R u+w "$patched_core"
 patch --batch --forward --silent -p1 -d "$patched_core" < "$core_patch"
 
-(cd "$task_build_dir" && env -u GOWORK go work init "$script_dir" "$patched_core")
-GOWORK="$work_file" "$@"
+mkdir -p "$wrapper_module"
+cp "$script_dir/go.mod" "$script_dir/go.sum" "$wrapper_module/"
+(
+    cd "$wrapper_module"
+    GOWORK=off go mod edit -replace="$core_module=$patched_core"
+    GOWORK=off "$@"
+)
