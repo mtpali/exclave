@@ -90,6 +90,9 @@
                                 android:id="@+id/action_new_wg"
                                 android:title="@string/action_wireguard" />
                             <item
+                                android:id="@+id/action_new_amneziawg"
+                                android:title="@string/action_amneziawg" />
+                            <item
                                 android:id="@+id/action_new_shadowquic"
                                 android:title="@string/action_shadowquic" />
                             <item

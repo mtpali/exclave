@@ -23,6 +23,11 @@
             app:title="@string/wireguard_local_address"
             app:useSimpleSummaryProvider="true" />
         <EditTextPreference
+            app:key="serverWireGuardAllowedIPs"
+            app:isPreferenceVisible="false"
+            app:title="@string/wireguard_allowed_ips"
+            app:useSimpleSummaryProvider="true" />
+        <EditTextPreference
             app:dialogLayout="@layout/layout_password_dialog"
             app:icon="@drawable/ic_baseline_vpn_key_24"
             app:key="serverPrivateKey"
@@ -54,6 +59,61 @@
             app:key="serverWireGuardReserved"
             app:title="@string/wireguard_reserved"
             app:useSimpleSummaryProvider="true" />
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        app:key="amneziawg10Category"
+        app:isPreferenceVisible="false"
+        app:title="@string/amneziawg_10">
+        <EditTextPreference app:key="serverWireGuardAwgJc" app:title="@string/amneziawg_jc" app:useSimpleSummaryProvider="true" />
+        <EditTextPreference app:key="serverWireGuardAwgJmin" app:title="@string/amneziawg_jmin" app:useSimpleSummaryProvider="true" />
+        <EditTextPreference app:key="serverWireGuardAwgJmax" app:title="@string/amneziawg_jmax" app:useSimpleSummaryProvider="true" />
+        <EditTextPreference app:key="serverWireGuardAwgS1" app:title="@string/amneziawg_s1" app:useSimpleSummaryProvider="true" />
+        <EditTextPreference app:key="serverWireGuardAwgS2" app:title="@string/amneziawg_s2" app:useSimpleSummaryProvider="true" />
+        <EditTextPreference app:key="serverWireGuardAwgH1" app:title="@string/amneziawg_h1" app:useSimpleSummaryProvider="true" />
+        <EditTextPreference app:key="serverWireGuardAwgH2" app:title="@string/amneziawg_h2" app:useSimpleSummaryProvider="true" />
+        <EditTextPreference app:key="serverWireGuardAwgH3" app:title="@string/amneziawg_h3" app:useSimpleSummaryProvider="true" />
+        <EditTextPreference app:key="serverWireGuardAwgH4" app:title="@string/amneziawg_h4" app:useSimpleSummaryProvider="true" />
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        app:key="amneziawg15Category"
+        app:isPreferenceVisible="false"
+        app:title="@string/amneziawg_15">
+        <EditTextPreference app:key="serverWireGuardAwgI1" app:title="@string/amneziawg_i1" app:useSimpleSummaryProvider="true" />
+        <EditTextPreference app:key="serverWireGuardAwgI2" app:title="@string/amneziawg_i2" app:useSimpleSummaryProvider="true" />
+        <EditTextPreference app:key="serverWireGuardAwgI3" app:title="@string/amneziawg_i3" app:useSimpleSummaryProvider="true" />
+        <EditTextPreference app:key="serverWireGuardAwgI4" app:title="@string/amneziawg_i4" app:useSimpleSummaryProvider="true" />
+        <EditTextPreference app:key="serverWireGuardAwgI5" app:title="@string/amneziawg_i5" app:useSimpleSummaryProvider="true" />
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        app:key="amneziawg20Category"
+        app:isPreferenceVisible="false"
+        app:title="@string/amneziawg_20">
+        <EditTextPreference app:key="serverWireGuardAwgS3" app:title="@string/amneziawg_s3" app:useSimpleSummaryProvider="true" />
+        <EditTextPreference app:key="serverWireGuardAwgS4" app:title="@string/amneziawg_s4" app:useSimpleSummaryProvider="true" />
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        app:key="amneziawg30Category"
+        app:isPreferenceVisible="false"
+        app:title="@string/amneziawg_30">
+        <EditTextPreference app:key="serverWireGuardAwgHeaderProtectionKey" app:title="@string/amneziawg_header_protection_key" app:useSimpleSummaryProvider="true" />
+        <EditTextPreference app:key="serverWireGuardAwgContentPadding" app:title="@string/amneziawg_content_padding" app:useSimpleSummaryProvider="true" />
+        <EditTextPreference app:key="serverWireGuardAwgRekeyAfterTime" app:title="@string/amneziawg_rekey_after_time" app:useSimpleSummaryProvider="true" />
+        <EditTextPreference app:key="serverWireGuardAwgRekeyTimeout" app:title="@string/amneziawg_rekey_timeout" app:useSimpleSummaryProvider="true" />
+        <EditTextPreference app:key="serverWireGuardAwgRejectAfterTime" app:title="@string/amneziawg_reject_after_time" app:useSimpleSummaryProvider="true" />
+        <EditTextPreference app:key="serverWireGuardAwgKeepaliveTimeout" app:title="@string/amneziawg_keepalive_timeout" app:useSimpleSummaryProvider="true" />
+        <EditTextPreference app:key="serverWireGuardAwgMaxHandshakeAttempts" app:title="@string/amneziawg_max_handshake_attempts" app:useSimpleSummaryProvider="true" />
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        app:key="amneziawg31Category"
+        app:isPreferenceVisible="false"
+        app:title="@string/amneziawg_31">
+        <SwitchPreference app:key="serverWireGuardAwgRandomizePacketTrailers" app:title="@string/amneziawg_randomize_packet_trailers" />
+        <SwitchPreference app:key="serverWireGuardAwgDisableCookieReplies" app:title="@string/amneziawg_disable_cookie_replies" />
     </PreferenceCategory>
 
 </PreferenceScreen>

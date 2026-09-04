@@ -61,6 +61,7 @@ import io.nekohasekai.sagernet.fmt.AbstractBean
 import io.nekohasekai.sagernet.fmt.exportBackup
 import io.nekohasekai.sagernet.fmt.v2ray.StandardV2RayBean
 import io.nekohasekai.sagernet.fmt.wireguard.toConf
+import io.nekohasekai.sagernet.fmt.wireguard.toAmneziaWGUri
 import io.nekohasekai.sagernet.group.GroupUpdater
 import io.nekohasekai.sagernet.group.Protocols
 import io.nekohasekai.sagernet.group.RawUpdater
@@ -504,6 +505,11 @@ class ConfigurationFragment @JvmOverloads constructor(
             }
             R.id.action_new_wg -> {
                 startActivity(Intent(requireActivity(), WireGuardSettingsActivity::class.java))
+            }
+            R.id.action_new_amneziawg -> {
+                startActivity(Intent(requireActivity(), WireGuardSettingsActivity::class.java).apply {
+                    putExtra(WireGuardSettingsActivity.EXTRA_AMNEZIAWG, true)
+                })
             }
             R.id.action_new_juicity -> {
                 startActivity(Intent(requireActivity(), JuicitySettingsActivity::class.java))
@@ -1797,14 +1803,18 @@ class ConfigurationFragment @JvmOverloads constructor(
                     when (item.itemId) {
                         R.id.action_qr -> {
                             if (entity.wgBean != null) {
-                                entity.wgBean?.toConf()?.let { showCode(it) }
+                                entity.wgBean?.let { bean ->
+                                    (if (bean.isAmneziaWG) bean.toAmneziaWGUri() else bean.toConf()).let { showCode(it) }
+                                }
                             } else {
                                 entity.toLink()?.let { showCode(it) }
                             }
                         }
                         R.id.action_clipboard -> {
                             if (entity.wgBean != null) {
-                                entity.wgBean?.toConf()?.let { export(it) }
+                                entity.wgBean?.let { bean ->
+                                    (if (bean.isAmneziaWG) bean.toAmneziaWGUri() else bean.toConf()).let { export(it) }
+                                }
                             } else {
                                 entity.toLink()?.let { export(it) }
                             }

@@ -1,0 +1,362 @@
+diff --git a/infra/conf/v4/wireguard.go b/infra/conf/v4/wireguard.go
+index c8586e2e6..55891c695 100644
+--- a/infra/conf/v4/wireguard.go
++++ b/infra/conf/v4/wireguard.go
+@@ -3,8 +3,10 @@ package v4
+ import (
+ 	"encoding/base64"
+ 	"encoding/hex"
++	"fmt"
+ 	"strings"
+ 
++	awgdevice "github.com/amnezia-vpn/amneziawg-go/v3/device"
+ 	"github.com/golang/protobuf/proto"
+ 
+ 	"github.com/exclavenetwork/exclave-core/v5/proxy/wireguard"
+@@ -50,6 +52,155 @@ type WireGuardClientConfig struct {
+ 	NumWorkers     int32                 `json:"workers"`
+ 	Reserved       []byte                `json:"reserved"`
+ 	DomainStrategy string                `json:"domainStrategy"`
++	Amnezia        *AmneziaWGConfig      `json:"amnezia,omitempty"`
++}
++
++// AmneziaWGConfig contains device-level options supported by amneziawg-go.
++// String fields intentionally preserve the range syntax accepted by the UAPI
++// (for example "30-45").
++type AmneziaWGConfig struct {
++	Jc                       uint32 `json:"jc,omitempty"`
++	Jmin                     uint32 `json:"jmin,omitempty"`
++	Jmax                     uint32 `json:"jmax,omitempty"`
++	S1                       uint32 `json:"s1,omitempty"`
++	S2                       uint32 `json:"s2,omitempty"`
++	S3                       uint32 `json:"s3,omitempty"`
++	S4                       uint32 `json:"s4,omitempty"`
++	H1                       string `json:"h1,omitempty"`
++	H2                       string `json:"h2,omitempty"`
++	H3                       string `json:"h3,omitempty"`
++	H4                       string `json:"h4,omitempty"`
++	I1                       string `json:"i1,omitempty"`
++	I2                       string `json:"i2,omitempty"`
++	I3                       string `json:"i3,omitempty"`
++	I4                       string `json:"i4,omitempty"`
++	I5                       string `json:"i5,omitempty"`
++	HeaderProtectionKey      string `json:"headerProtectionKey,omitempty"`
++	ContentPaddingAddition   string `json:"contentPaddingAddition,omitempty"`
++	RekeyAfterTime           string `json:"rekeyAfterTime,omitempty"`
++	RekeyTimeout             string `json:"rekeyTimeout,omitempty"`
++	RejectAfterTime          string `json:"rejectAfterTime,omitempty"`
++	KeepaliveTimeout         string `json:"keepaliveTimeout,omitempty"`
++	MaxHandshakeAttempts     string `json:"maxHandshakeAttempts,omitempty"`
++	RandomizePacketTrailers  bool   `json:"randomizePacketTrailers,omitempty"`
++	DisableCookieReplies     bool   `json:"disableCookieReplies,omitempty"`
++}
++
++func validateAmneziaRange(name, value string) error {
++	if value == "" {
++		return nil
++	}
++	var r awgdevice.UintRange
++	if err := r.FromString(value); err != nil {
++		return newError("invalid AmneziaWG ", name, ": ", value).Base(err)
++	}
++	return nil
++}
++
++func validateAmneziaChain(name, value string) error {
++	if strings.ContainsAny(value, "\r\n") {
++		return newError("invalid newline in AmneziaWG ", name)
++	}
++	return nil
++}
++
++func parseAmneziaKey(key string) (string, error) {
++	if key == "" {
++		return "", nil
++	}
++	if decoded, err := hex.DecodeString(key); err == nil && len(decoded) == 32 {
++		return strings.ToLower(key), nil
++	}
++	decoded, err := base64.StdEncoding.DecodeString(key)
++	if err != nil || len(decoded) != 32 {
++		return "", newError("invalid AmneziaWG header protection key")
++	}
++	return hex.EncodeToString(decoded), nil
++}
++
++func (c *AmneziaWGConfig) BuildIPC() (string, error) {
++	if c == nil {
++		return "", nil
++	}
++	if c.Jmax != 0 && c.Jmin > c.Jmax {
++		return "", newError("AmneziaWG jmin must not be greater than jmax")
++	}
++	for name, value := range map[string]uint32{
++		"s1": c.S1, "s2": c.S2, "s3": c.S3, "s4": c.S4,
++	} {
++		if value > 1<<16-1 {
++			return "", newError("AmneziaWG ", name, " must not exceed 65535")
++		}
++	}
++	for name, value := range map[string]string{
++		"h1": c.H1, "h2": c.H2, "h3": c.H3, "h4": c.H4,
++		"contentPaddingAddition": c.ContentPaddingAddition,
++		"rekeyAfterTime": c.RekeyAfterTime,
++		"rekeyTimeout": c.RekeyTimeout,
++		"rejectAfterTime": c.RejectAfterTime,
++		"keepaliveTimeout": c.KeepaliveTimeout,
++		"maxHandshakeAttempts": c.MaxHandshakeAttempts,
++	} {
++		if err := validateAmneziaRange(name, value); err != nil {
++			return "", err
++		}
++	}
++	for name, value := range map[string]string{
++		"i1": c.I1, "i2": c.I2, "i3": c.I3, "i4": c.I4, "i5": c.I5,
++	} {
++		if err := validateAmneziaChain(name, value); err != nil {
++			return "", err
++		}
++	}
++	headerKey, err := parseAmneziaKey(c.HeaderProtectionKey)
++	if err != nil {
++		return "", err
++	}
++	if headerKey != "" && (c.S1 < 12 || c.S2 < 12 || c.S3 < 12 || c.S4 < 12) {
++		return "", newError("AmneziaWG header protection requires s1-s4 to be at least 12")
++	}
++
++	var request strings.Builder
++	writeUint := func(name string, value uint32) {
++		if value != 0 {
++			fmt.Fprintf(&request, "%s=%d\n", name, value)
++		}
++	}
++	writeString := func(name, value string) {
++		if value != "" {
++			fmt.Fprintf(&request, "%s=%s\n", name, value)
++		}
++	}
++	writeUint("jc", c.Jc)
++	writeUint("jmin", c.Jmin)
++	writeUint("jmax", c.Jmax)
++	writeUint("s1", c.S1)
++	writeUint("s2", c.S2)
++	writeUint("s3", c.S3)
++	writeUint("s4", c.S4)
++	writeString("h1", c.H1)
++	writeString("h2", c.H2)
++	writeString("h3", c.H3)
++	writeString("h4", c.H4)
++	writeString("i1", c.I1)
++	writeString("i2", c.I2)
++	writeString("i3", c.I3)
++	writeString("i4", c.I4)
++	writeString("i5", c.I5)
++	writeString("header_protection_key", headerKey)
++	writeString("content_padding_addition", c.ContentPaddingAddition)
++	writeString("rekey_after_time", c.RekeyAfterTime)
++	writeString("rekey_timeout", c.RekeyTimeout)
++	writeString("reject_after_time", c.RejectAfterTime)
++	writeString("keepalive_timeout", c.KeepaliveTimeout)
++	writeString("max_handshake_attempts", c.MaxHandshakeAttempts)
++	if c.RandomizePacketTrailers {
++		request.WriteString("random_trailers=true\n")
++	}
++	if c.DisableCookieReplies {
++		request.WriteString("disable_cookies=true\n")
++	}
++	return request.String(), nil
+ }
+ 
+ func (c *WireGuardClientConfig) Build() (proto.Message, error) {
+@@ -82,6 +233,10 @@ func (c *WireGuardClientConfig) Build() (proto.Message, error) {
+ 		return nil, newError(`"reserved" should be empty or 3 bytes`)
+ 	}
+ 	config.Reserved = c.Reserved
++	config.AmneziaConfig, err = c.Amnezia.BuildIPC()
++	if err != nil {
++		return nil, err
++	}
+ 	switch strings.ToLower(c.DomainStrategy) {
+ 	case "useip", "":
+ 		config.DomainStrategy = wireguard.ClientConfig_USE_IP
+diff --git a/proxy/wireguard/bind.go b/proxy/wireguard/bind.go
+index 18e12f3ec..89aaa7398 100644
+--- a/proxy/wireguard/bind.go
++++ b/proxy/wireguard/bind.go
+@@ -7,8 +7,8 @@ import (
+ 	"runtime"
+ 	"sync"
+ 
+-	"golang.zx2c4.com/wireguard/conn"
+-	"golang.zx2c4.com/wireguard/device"
++	"github.com/amnezia-vpn/amneziawg-go/v3/conn"
++	"github.com/amnezia-vpn/amneziawg-go/v3/device"
+ 
+ 	"github.com/exclavenetwork/exclave-core/v5/common/buf"
+ 	"github.com/exclavenetwork/exclave-core/v5/common/net"
+diff --git a/proxy/wireguard/client.go b/proxy/wireguard/client.go
+index b03ae0aee..b60215082 100644
+--- a/proxy/wireguard/client.go
++++ b/proxy/wireguard/client.go
+@@ -230,7 +230,7 @@ func (c *Client) makeVirtualTun() (Tunnel, error) {
+ 		return nil, err
+ 	}
+ 
+-	if err = t.BuildDevice(createIPCRequest(c.conf.SecretKey, c.conf.Peers, false), c.bind); err != nil {
++	if err = t.BuildDevice(createIPCRequest(c.conf.SecretKey, c.conf.Peers, false, c.conf.AmneziaConfig), c.bind); err != nil {
+ 		_ = t.Close()
+ 		return nil, err
+ 	}
+diff --git a/proxy/wireguard/config.pb.go b/proxy/wireguard/config.pb.go
+index a6e5152d0..4f9ae6edc 100644
+--- a/proxy/wireguard/config.pb.go
++++ b/proxy/wireguard/config.pb.go
+@@ -156,6 +156,7 @@ type ClientConfig struct {
+ 	NumWorkers     int32                       `protobuf:"varint,5,opt,name=num_workers,json=numWorkers,proto3" json:"num_workers,omitempty"`
+ 	Reserved       []byte                      `protobuf:"bytes,6,opt,name=reserved,proto3" json:"reserved,omitempty"`
+ 	DomainStrategy ClientConfig_DomainStrategy `protobuf:"varint,7,opt,name=domain_strategy,json=domainStrategy,proto3,enum=exclave.core.proxy.wireguard.ClientConfig_DomainStrategy" json:"domain_strategy,omitempty"`
++	AmneziaConfig  string                      `protobuf:"bytes,8,opt,name=amnezia_config,json=amneziaConfig,proto3" json:"amnezia_config,omitempty"`
+ 	unknownFields  protoimpl.UnknownFields
+ 	sizeCache      protoimpl.SizeCache
+ }
+@@ -239,6 +240,13 @@ func (x *ClientConfig) GetDomainStrategy() ClientConfig_DomainStrategy {
+ 	return ClientConfig_USE_IP
+ }
+ 
++func (x *ClientConfig) GetAmneziaConfig() string {
++	if x != nil {
++		return x.AmneziaConfig
++	}
++	return ""
++}
++
+ type ServerConfig struct {
+ 	state         protoimpl.MessageState `protogen:"open.v1"`
+ 	SecretKey     string                 `protobuf:"bytes,1,opt,name=secret_key,json=secretKey,proto3" json:"secret_key,omitempty"`
+@@ -329,7 +337,7 @@ const file_proxy_wireguard_config_proto_rawDesc = "" +
+ 	"\n" +
+ 	"keep_alive\x18\x04 \x01(\rR\tkeepAlive\x12\x1f\n" +
+ 	"\vallowed_ips\x18\x05 \x03(\tR\n" +
+-	"allowedIps\"\xad\x03\n" +
++	"allowedIps\"\xd4\x03\n" +
+ 	"\fClientConfig\x12\x1d\n" +
+ 	"\n" +
+ 	"secret_key\x18\x01 \x01(\tR\tsecretKey\x12\x18\n" +
+@@ -339,7 +347,8 @@ const file_proxy_wireguard_config_proto_rawDesc = "" +
+ 	"\vnum_workers\x18\x05 \x01(\x05R\n" +
+ 	"numWorkers\x12\x1a\n" +
+ 	"\breserved\x18\x06 \x01(\fR\breserved\x12b\n" +
+-	"\x0fdomain_strategy\x18\a \x01(\x0e29.exclave.core.proxy.wireguard.ClientConfig.DomainStrategyR\x0edomainStrategy\"V\n" +
++	"\x0fdomain_strategy\x18\a \x01(\x0e29.exclave.core.proxy.wireguard.ClientConfig.DomainStrategyR\x0edomainStrategy\x12%\n" +
++	"\x0eamnezia_config\x18\b \x01(\tR\ramneziaConfig\"V\n" +
+ 	"\x0eDomainStrategy\x12\n" +
+ 	"\n" +
+ 	"\x06USE_IP\x10\x00\x12\v\n" +
+diff --git a/proxy/wireguard/config.proto b/proxy/wireguard/config.proto
+index 300bc3565..801790b43 100644
+--- a/proxy/wireguard/config.proto
++++ b/proxy/wireguard/config.proto
+@@ -35,6 +35,9 @@ message ClientConfig {
+   int32 num_workers = 5;
+   bytes reserved = 6;
+   DomainStrategy domain_strategy = 7;
++  // Canonical AmneziaWG device UAPI options. Empty keeps standard WireGuard
++  // behaviour. The JSON layer validates and builds this value.
++  string amnezia_config = 8;
+ }
+ 
+ message ServerConfig {
+@@ -46,4 +49,4 @@ message ServerConfig {
+   repeated PeerConfig peers = 3;
+   int32 mtu = 4;
+   int32 num_workers = 5;
+-}
+\ No newline at end of file
++}
+diff --git a/proxy/wireguard/device.go b/proxy/wireguard/device.go
+index a0042389f..004e58d4f 100644
+--- a/proxy/wireguard/device.go
++++ b/proxy/wireguard/device.go
+@@ -8,9 +8,9 @@ import (
+ 	"sync"
+ 	"time"
+ 
+-	"golang.zx2c4.com/wireguard/conn"
+-	"golang.zx2c4.com/wireguard/device"
+-	"golang.zx2c4.com/wireguard/tun"
++	"github.com/amnezia-vpn/amneziawg-go/v3/conn"
++	"github.com/amnezia-vpn/amneziawg-go/v3/device"
++	"github.com/amnezia-vpn/amneziawg-go/v3/tun"
+ 	"gvisor.dev/gvisor/pkg/buffer"
+ 	"gvisor.dev/gvisor/pkg/tcpip"
+ 	"gvisor.dev/gvisor/pkg/tcpip/adapters/gonet"
+diff --git a/proxy/wireguard/netstack/tun.go b/proxy/wireguard/netstack/tun.go
+index 16c077e76..e2c3925d4 100644
+--- a/proxy/wireguard/netstack/tun.go
++++ b/proxy/wireguard/netstack/tun.go
+@@ -30,7 +30,7 @@ import (
+ 	"sync"
+ 	"syscall"
+ 
+-	"golang.zx2c4.com/wireguard/tun"
++	"github.com/amnezia-vpn/amneziawg-go/v3/tun"
+ 	"gvisor.dev/gvisor/pkg/buffer"
+ 	"gvisor.dev/gvisor/pkg/tcpip"
+ 	"gvisor.dev/gvisor/pkg/tcpip/adapters/gonet"
+diff --git a/proxy/wireguard/server.go b/proxy/wireguard/server.go
+index ae8e88183..6394429f5 100644
+--- a/proxy/wireguard/server.go
++++ b/proxy/wireguard/server.go
+@@ -45,7 +45,7 @@ func NewServer(ctx context.Context, conf *ServerConfig) (*Server, error) {
+ 		return nil, err
+ 	}
+ 
+-	if err = tun.BuildDevice(createIPCRequest(conf.SecretKey, conf.Peers, true), server.bind); err != nil {
++	if err = tun.BuildDevice(createIPCRequest(conf.SecretKey, conf.Peers, true, ""), server.bind); err != nil {
+ 		_ = tun.Close()
+ 		return nil, err
+ 	}
+diff --git a/proxy/wireguard/wireguard.go b/proxy/wireguard/wireguard.go
+index 3fda5d01f..ada38fefe 100644
+--- a/proxy/wireguard/wireguard.go
++++ b/proxy/wireguard/wireguard.go
+@@ -51,10 +51,16 @@ func parseEndpoints(ep []string) ([]netip.Addr, bool, bool, error) {
+ }
+ 
+ // serialize the config into an IPC request
+-func createIPCRequest(secretKey string, peers []*PeerConfig, isServer bool) string {
++func createIPCRequest(secretKey string, peers []*PeerConfig, isServer bool, amneziaConfig string) string {
+ 	var request strings.Builder
+ 
+ 	fmt.Fprintf(&request, "private_key=%s\n", secretKey)
++	if amneziaConfig != "" {
++		request.WriteString(amneziaConfig)
++		if !strings.HasSuffix(amneziaConfig, "\n") {
++			request.WriteByte('\n')
++		}
++	}
+ 
+ 	if isServer {
+ 		// placeholder, we'll handle actual port listening on Xray
+diff --git a/go.mod b/go.mod
+--- a/go.mod
++++ b/go.mod
+@@ -7,4 +7,5 @@ require (
+ 	github.com/adrg/xdg v0.5.3
+ 	github.com/aead/chacha20 v0.0.0-20180709150244-8b13a72661da
+ 	github.com/anytls/sing-anytls v0.0.13
++	github.com/amnezia-vpn/amneziawg-go/v3 v3.1.20260828
+ 	github.com/apernet/quic-go v0.61.1-0.20260806010916-184d081eef3e
+@@ -40,5 +41,4 @@ require (
+ 	golang.org/x/net v0.58.0
+ 	golang.org/x/sync v0.22.0
+ 	golang.org/x/sys v0.47.0
+-	golang.zx2c4.com/wireguard v0.0.0-20260522210424-ecfc5a8d5446
+ 	google.golang.org/grpc v1.83.1
+diff --git a/go.sum b/go.sum
+--- a/go.sum
++++ b/go.sum
+@@ -22,0 +23,2 @@
++github.com/amnezia-vpn/amneziawg-go/v3 v3.1.20260828 h1:D8d8gGvwXcTxUIsE4z6F6vjy4/VZddu95vMNtOygh1c=
++github.com/amnezia-vpn/amneziawg-go/v3 v3.1.20260828/go.mod h1:YoPc6qcOZqD7TXZ1xpedD8Sx3aSKsxN05ZqEFmXDNHk=

@@ -69,6 +69,7 @@ import io.nekohasekai.sagernet.fmt.v2ray.VLESSBean
 import io.nekohasekai.sagernet.fmt.v2ray.VMessBean
 import io.nekohasekai.sagernet.fmt.v2ray.toUri
 import io.nekohasekai.sagernet.fmt.wireguard.WireGuardBean
+import io.nekohasekai.sagernet.fmt.wireguard.toAmneziaWGUri
 import io.nekohasekai.sagernet.ktx.app
 import io.nekohasekai.sagernet.ktx.applyDefaultValues
 import io.nekohasekai.sagernet.ui.profile.*
@@ -242,7 +243,7 @@ data class ProxyEntity(
         TYPE_NAIVE -> "NaïveProxy"
         TYPE_HYSTERIA2 -> "Hysteria 2"
         TYPE_SSH -> "SSH"
-        TYPE_WG -> "WireGuard"
+        TYPE_WG -> if (wgBean?.isAmneziaWG == true) "AmneziaWG" else "WireGuard"
         TYPE_MIERU -> "mieru"
         TYPE_TUIC5 -> "TUIC"
         TYPE_JUICITY -> "Juicity"
@@ -324,6 +325,7 @@ data class ProxyEntity(
             is AnyTLSBean -> toUri()
             is TrustTunnelBean -> toUri()
             is ShadowQUICBean -> toUri()
+            is WireGuardBean -> if (isAmneziaWG) toAmneziaWGUri() else null
             else -> null
         }
     }
@@ -516,6 +518,9 @@ data class ProxyEntity(
         ).apply {
             putExtra(ProfileSettingsActivity.EXTRA_PROFILE_ID, id)
             putExtra(ProfileSettingsActivity.EXTRA_IS_SUBSCRIPTION, isSubscription)
+            if (type == TYPE_WG && wgBean?.isAmneziaWG == true) {
+                putExtra(WireGuardSettingsActivity.EXTRA_AMNEZIAWG, true)
+            }
         }
     }
 

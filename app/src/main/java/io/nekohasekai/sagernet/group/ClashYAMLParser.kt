@@ -890,10 +890,7 @@ fun parseClashProxy(proxy: Map<String, Any?>): List<AbstractBean> {
             })
         }
         "wireguard" -> {
-            proxy.getObject("amnezia-wg-option")?.also {
-                // unsupported
-                return listOf()
-            }
+            val amnezia = proxy.getObject("amnezia-wg-option")
             val beanList = mutableListOf<WireGuardBean>()
             val bean = WireGuardBean().apply {
                 serverAddress = proxy.getString("server")
@@ -906,6 +903,37 @@ fun parseClashProxy(proxy: Map<String, Any?>): List<AbstractBean> {
                 localAddress = listOfNotNull(proxy.getString("ip"), proxy.getString("ipv6")).joinToString("\n")
                 keepaliveInterval = proxy.getInt("persistent-keepalive")
                 name = proxy.getString("name")
+                if (amnezia != null) {
+                    isAmneziaWG = true
+                    allowedIPs = (proxy["allowed-ips"] as? List<*>)
+                        ?.mapNotNull { it?.toString() }?.joinToString("\n")
+                        ?: "0.0.0.0/0\n::/0"
+                    awgJc = amnezia.getInt("jc") ?: 0
+                    awgJmin = amnezia.getInt("jmin") ?: 0
+                    awgJmax = amnezia.getInt("jmax") ?: 0
+                    awgS1 = amnezia.getInt("s1") ?: 0
+                    awgS2 = amnezia.getInt("s2") ?: 0
+                    awgS3 = amnezia.getInt("s3") ?: 0
+                    awgS4 = amnezia.getInt("s4") ?: 0
+                    awgH1 = amnezia.getString("h1").orEmpty()
+                    awgH2 = amnezia.getString("h2").orEmpty()
+                    awgH3 = amnezia.getString("h3").orEmpty()
+                    awgH4 = amnezia.getString("h4").orEmpty()
+                    awgI1 = amnezia.getString("i1").orEmpty()
+                    awgI2 = amnezia.getString("i2").orEmpty()
+                    awgI3 = amnezia.getString("i3").orEmpty()
+                    awgI4 = amnezia.getString("i4").orEmpty()
+                    awgI5 = amnezia.getString("i5").orEmpty()
+                    awgHeaderProtectionKey = amnezia.getString("header-protection-key").orEmpty()
+                    awgContentPaddingAddition = amnezia.getString("content-padding-addition").orEmpty()
+                    awgRekeyAfterTime = amnezia.getString("rekey-after-time").orEmpty()
+                    awgRekeyTimeout = amnezia.getString("rekey-timeout").orEmpty()
+                    awgRejectAfterTime = amnezia.getString("reject-after-time").orEmpty()
+                    awgKeepaliveTimeout = amnezia.getString("keepalive-timeout").orEmpty()
+                    awgMaxHandshakeAttempts = amnezia.getString("max-handshake-attempts").orEmpty()
+                    awgRandomizePacketTrailers = amnezia.getBoolean("random-trailers") == true
+                    awgDisableCookieReplies = amnezia.getBoolean("disable-cookies") == true
+                }
                 proxy.getIntArray("reserved")?.also {
                     if (it.size == 3) {
                         reserved = listOf(
@@ -938,6 +966,11 @@ fun parseClashProxy(proxy: Map<String, Any?>): List<AbstractBean> {
                         serverPort = peer.getInt("port")
                         peerPublicKey = peer.getString("public-key")
                         peerPreSharedKey = peer.getString("pre-shared-key")
+                        if (amnezia != null) {
+                            allowedIPs = (peer["allowed-ips"] as? List<*>)
+                                ?.mapNotNull { it?.toString() }?.joinToString("\n")
+                                ?: allowedIPs
+                        }
                         peer.getIntArray("reserved")?.also {
                             if (it.size == 3) {
                                 reserved = listOf(

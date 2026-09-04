@@ -1,6 +1,9 @@
 #!/bin/bash
 
-CGO_LDFLAGS="-Wl,-z,max-page-size=16384" gomobile bind -v -androidapi 21 -tags="with_clash" "github.com/exclavenetwork/libexclavecore" || exit 1
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CGO_LDFLAGS="-Wl,-z,max-page-size=16384" bash "$script_dir/with_amnezia_core.sh" \
+  gomobile bind -v -androidapi 21 -tags="with_clash" \
+  "github.com/exclavenetwork/libexclavecore" || exit 1
 
 proj=../../app/libs
 if [ -d $proj ]; then
