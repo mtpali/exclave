@@ -56,14 +56,11 @@ jobs:
         run: |
           echo "sdk.dir=${ANDROID_HOME}" > local.properties
           ./gradlew :app:downloadAssets
-          ./gradlew -PuniversalApk=true :app:assembleOssDebug :app:assembleLegacyDebug
+          ./gradlew --no-daemon --max-workers=1 \
+            -Pkotlin.compiler.execution.strategy=in-process \
+            -PuniversalApk=true :app:assembleOssDebug
       - name: Upload Artifacts
         uses: actions/upload-artifact@v7
         with:
           name: APKs
           path: app/build/outputs/apk/oss/debug
-      - name: Upload Artifacts
-        uses: actions/upload-artifact@v7
-        with:
-          name: APKs-legacy
-          path: app/build/outputs/apk/legacy/debug
