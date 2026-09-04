@@ -127,7 +127,7 @@ jobs:
             artifacts/MobileTina-ARMv7-ARMv8-universal.apk)"
           printf '%s\n' "$verification_output"
           apk_signer_sha="$(printf '%s\n' "$verification_output" | \
-            sed -n 's/^Signer #1 certificate SHA-256 digest: //p' | head -n 1)"
+            awk -F ': ' '/certificate SHA-256 digest:/ { print $NF; exit }')"
           if [ "$apk_signer_sha" != "$signer_sha" ]; then
             echo "APK signing certificate does not match the expected fingerprint" >&2
             exit 1
